@@ -27,7 +27,7 @@
     --tabh:52px;
   }
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-  html,body{background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased;overflow:hidden;height:100%;position:fixed;width:100%;touch-action:manipulation}
+  html,body{background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased;overflow:hidden;height:100%;width:100%;touch-action:manipulation}
   body{padding-top:var(--sat);padding-bottom:calc(var(--sab) + var(--tabh));padding-left:var(--sal);padding-right:var(--sar)}
   .topbar{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--surface);border-bottom:1px solid var(--border);position:relative;z-index:10;flex-shrink:0}
   .topbar .logo{font-size:13px;font-weight:800;background:linear-gradient(135deg,#f1d07a,#d4a546 40%,#b8862d);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
@@ -41,7 +41,7 @@
   .tabbar button .ico{font-size:18px;line-height:1}
   .tabbar button.active{color:var(--gold)}
   .tabbar button:active{opacity:.6}
-  .tablewrap{position:relative;background:radial-gradient(ellipse 110% 70% at 50% 48%,var(--felt1) 0%,var(--felt2) 45%,var(--felt3) 100%);border:7px solid #1a1d25;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(212,165,70,.3),inset 0 0 50px rgba(0,0,0,.5),0 0 0 1px #2a2d38,0 8px 30px rgba(0,0,0,.7);aspect-ratio:1.55/1;min-height:180px;flex-shrink:0;overflow:visible}
+  .tablewrap{position:relative;background:radial-gradient(ellipse 110% 70% at 50% 48%,var(--felt1) 0%,var(--felt2) 45%,var(--felt3) 100%);border:7px solid #1a1d25;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(212,165,70,.3),inset 0 0 50px rgba(0,0,0,.5),0 0 0 1px #2a2d38,0 8px 30px rgba(0,0,0,.7);aspect-ratio:1.55/1;max-height:30vh;flex-shrink:1;overflow:visible;min-height:140px}
   .tablewrap::after{content:'';position:absolute;inset:8px;border:1px solid rgba(255,255,255,.04);border-radius:50%;pointer-events:none}
   .tablewrap::before{content:'HOLD\'EM';position:absolute;left:50%;top:11%;transform:translateX(-50%);font-family:var(--mono);font-size:7px;letter-spacing:.3em;color:rgba(255,255,255,.03);font-weight:800;pointer-events:none}
   .center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;width:72%}
@@ -76,7 +76,7 @@
   .seat .bet{position:absolute;left:50%;transform:translateX(-50%);top:-32px;display:inline-flex;align-items:center;gap:2px;font-family:var(--mono);font-size:8px;font-weight:700;color:#ffe6ad;background:rgba(0,0,0,.45);border:1px solid rgba(212,165,70,.2);padding:1px 5px;border-radius:6px;white-space:nowrap;z-index:5}
   .seat .bet::before{content:'';width:5px;height:5px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffb0b0,var(--red) 60%,#7e1f1a)}
   .seat.hero .bet{top:-50px}.seat.top .bet{top:auto;bottom:-14px}
-  .controls{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:8px;margin-top:6px;flex-shrink:0}
+  .controls{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:8px;margin-top:6px;flex-shrink:0;overflow-y:auto;max-height:55vh}
   .actrow{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
   button.gbtn{font-family:var(--sans);font-weight:700;border:none;padding:12px 8px;border-radius:18px;cursor:pointer;font-size:12px;transition:all .1s;-webkit-tap-highlight-color:transparent}
   button.gbtn:active:not(:disabled){transform:scale(.94)}
@@ -1628,21 +1628,18 @@ document.querySelectorAll('.tabbar button').forEach(function(btn) {
   });
 });
 
-// Prevent iOS bounce (safe for test environments)
-if (document.body && document.body.addEventListener) {
-  document.body.addEventListener('touchmove', function(e) {
-    if (e.target.closest && (e.target.closest('.tabcontent') || e.target.closest('.coach') || e.target.closest('.solver-report'))) return;
-    if (e.preventDefault) e.preventDefault();
-  }, { passive: false });
-}
+// (touchmove bounce prevention removed - interferes with button taps)
 
 // Adjust table on resize (safe for test environments)
 function adjustTable() {
   var tw = document.querySelector ? document.querySelector('.tablewrap') : null;
   if (!tw || !tw.parentElement) return;
+  var vh = window.innerHeight || 600;
   var w = (tw.parentElement.clientWidth || 300) - 12;
-  var h = Math.min(w * 0.62, (window.innerHeight || 600) * 0.35);
+  var maxH = Math.floor(vh * 0.30);
+  var h = Math.min(Math.floor(w / 1.55), maxH);
   tw.style.minHeight = h + 'px';
+  tw.style.maxHeight = maxH + 'px';
 }
 if (window.addEventListener) {
   window.addEventListener('resize', adjustTable);

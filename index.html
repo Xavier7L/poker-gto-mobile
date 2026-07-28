@@ -40,7 +40,7 @@
   .tabbar button.active{color:var(--gold);background:rgba(232,185,74,.1)}
   .tabbar button:active{opacity:.6}
   .table-area{position:relative;flex-shrink:0;display:flex;align-items:center;justify-content:center}
-  .tablewrap{position:relative;background:radial-gradient(ellipse 90% 55% at 50% 46%,rgba(255,255,255,.06) 0%,transparent 60%),radial-gradient(ellipse 100% 65% at 50% 48%,#12a06e 0%,var(--felt1) 30%,var(--felt2) 60%,var(--felt3) 100%);border:9px solid #1e2a36;border-radius:50%;box-shadow:inset 0 0 60px rgba(0,0,0,.3),0 8px 40px rgba(0,0,0,.5);width:94vw;max-width:100%;height:72vh;flex-shrink:0;overflow:visible}
+  .tablewrap{position:relative;background:radial-gradient(ellipse 90% 55% at 50% 46%,rgba(255,255,255,.06) 0%,transparent 60%),radial-gradient(ellipse 100% 65% at 50% 48%,#12a06e 0%,var(--felt1) 30%,var(--felt2) 60%,var(--felt3) 100%);border:9px solid #1e2a36;border-radius:50%;box-shadow:inset 0 0 60px rgba(0,0,0,.3),0 8px 40px rgba(0,0,0,.5);width:94vw;max-width:100%;height:70vh;flex-shrink:0;overflow:visible}
   .tablewrap::after{content:'';position:absolute;inset:12px;border:1px solid rgba(255,255,255,.04);border-radius:50%;pointer-events:none}
   .tablewrap::before{content:'';position:absolute;inset:0;border-radius:50%;background:repeating-conic-gradient(rgba(255,255,255,.008) 0deg 1deg,transparent 1deg 3deg);pointer-events:none}
   .center{position:absolute;top:46%;left:50%;transform:translate(-50%,-50%);text-align:center;width:80%}
@@ -100,11 +100,11 @@
   .chips button{padding:6px 10px;font-size:9px;font-family:var(--mono);background:rgba(30,42,54,.7);color:var(--text2);border:1px solid rgba(255,255,255,.08);border-radius:14px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .1s}
   .chips button:active{background:var(--gold);color:#2a1a04;border-color:var(--gold)}
   .hint{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:5px;min-height:12px;text-align:center}
-  .cwrap{position:relative;width:52px;height:52px;margin:4px auto;touch-action:none;user-select:none;-webkit-user-select:none;flex-shrink:0}
-  .cicon{width:52px;height:52px;border-radius:50%;background:rgba(17,24,39,.65);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(232,185,74,.35);display:flex;align-items:center;justify-content:center;font-size:26px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.45);transition:transform .15s ease}
+  .cwrap{position:absolute;left:6px;top:50%;transform:translateY(-50%);width:42px;height:42px;touch-action:none;user-select:none;-webkit-user-select:none;z-index:10}
+  .cicon{width:42px;height:42px;border-radius:50%;background:rgba(17,24,39,.65);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(232,185,74,.35);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.45);transition:transform .15s ease}
   .cicon:active{transform:scale(.92)}
   .cicon .cdot{position:absolute;top:4px;right:4px;width:8px;height:8px;background:var(--gold);border-radius:50%;box-shadow:0 0 6px var(--gold);display:none}
-  .coach{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);width:270px;max-height:55vh;overflow-y:auto;background:rgba(17,24,39,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(232,185,74,.22);border-radius:14px;padding:28px 12px 10px 12px;font-size:11px;line-height:1.4;display:none;box-shadow:0 8px 32px rgba(0,0,0,.55);z-index:10}
+  .coach{position:absolute;top:50%;left:50px;transform:translateY(-50%);width:240px;max-height:50vh;overflow-y:auto;background:rgba(17,24,39,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(232,185,74,.22);border-radius:14px;padding:28px 12px 10px 12px;font-size:11px;line-height:1.4;display:none;box-shadow:0 8px 32px rgba(0,0,0,.55);z-index:10}
   .cwrap.expanded .coach{display:block;animation:slideUp .2s ease}
   .cwrap:not(.expanded) .coach{display:none}
   .cwrap.expanded .cicon .cdot{display:none}
@@ -211,11 +211,11 @@
     <div class="chips" id="chipBar">
       <button data-pot="0.33">⅓</button><button data-pot="0.5">½</button><button data-pot="0.66">⅔</button><button data-pot="0.75">¾</button><button data-pot="1">1x</button><button data-pot="1.5">超池</button><button data-pot="allin">All-in</button>
     </div>
-  </div>
-  <div class="cwrap" id="cwrap">
-    <div class="cicon" id="cicon">💡<span class="cdot"></span></div>
-    <span class="coach-x" id="coachX">✕</span>
-    <div class="coach" id="coach"></div>
+    <div class="cwrap" id="cwrap">
+      <div class="cicon" id="cicon">💡<span class="cdot"></span></div>
+      <span class="coach-x" id="coachX">✕</span>
+      <div class="coach" id="coach"></div>
+    </div>
   </div>
   <div class="controls">
     <div class="actrow" id="actrow">

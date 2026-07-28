@@ -38,9 +38,9 @@
   .tabbar button .ico{font-size:16px;line-height:1}
   .tabbar button.active{color:var(--gold)}
   .tabbar button:active{opacity:.6}
-  .tablewrap{position:relative;background:radial-gradient(ellipse 100% 65% at 50% 48%,#11996e 0%,var(--felt1) 25%,var(--felt2) 55%,var(--felt3) 85%,#043d2a 100%);border:10px solid transparent;border-image:linear-gradient(135deg,#5a3d1a,#8b6914,#5a3d1a,#3d2810,#5a3d1a) 1;border-radius:50%;box-shadow:inset 0 0 0 3px rgba(232,185,74,.18),inset 0 0 80px rgba(0,0,0,.35),0 0 0 2px #2a1d0e,0 10px 50px rgba(0,0,0,.6);width:94vw;max-width:100%;height:76vh;flex-shrink:1;overflow:visible}
-  .tablewrap::after{content:'';position:absolute;inset:14px;border:1.5px solid rgba(255,255,255,.07);border-radius:50%;pointer-events:none;animation:tableShimmer 8s ease-in-out infinite}
-  .tablewrap::before{content:'';position:absolute;inset:0;border-radius:50%;background:radial-gradient(ellipse 80% 50% at 50% 45%,rgba(255,255,255,.04) 0%,transparent 70%);pointer-events:none}
+  .tablewrap{position:relative;background:radial-gradient(ellipse 90% 55% at 50% 46%,rgba(255,255,255,.06) 0%,transparent 60%),radial-gradient(ellipse 100% 65% at 50% 48%,#12a06e 0%,var(--felt1) 30%,var(--felt2) 60%,var(--felt3) 100%);border:9px solid #1e2a36;border-radius:50%;box-shadow:inset 0 0 60px rgba(0,0,0,.3),0 8px 40px rgba(0,0,0,.5);width:94vw;max-width:100%;height:76vh;flex-shrink:0;overflow:visible}
+  .tablewrap::after{content:'';position:absolute;inset:12px;border:1px solid rgba(255,255,255,.04);border-radius:50%;pointer-events:none}
+  .tablewrap::before{content:'';position:absolute;inset:0;border-radius:50%;background:repeating-conic-gradient(rgba(255,255,255,.008) 0deg 1deg,transparent 1deg 3deg);pointer-events:none}
   .center{position:absolute;top:46%;left:50%;transform:translate(-50%,-50%);text-align:center;width:80%}
   .board{display:flex;gap:5px;justify-content:center;min-height:48px;align-items:center}
   .street{display:inline-block;font-family:var(--mono);font-size:10px;color:#b8e6d8;letter-spacing:.15em;text-transform:uppercase;margin-bottom:4px;background:rgba(0,0,0,.5);border:1px solid rgba(232,185,74,.22);border-radius:8px;padding:3px 10px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
@@ -64,8 +64,8 @@
   .seat.folded{opacity:.3}
   .avwrap{position:relative;width:44px;height:44px;margin:0 auto}
   .avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;color:#fff;border:3px solid rgba(255,255,255,.18);box-shadow:0 3px 12px rgba(0,0,0,.5),inset 0 -2px 4px rgba(0,0,0,.2);position:relative;z-index:2;transition:all .15s;text-shadow:0 1px 3px rgba(0,0,0,.5)}
-  .seat.active .avwrap::after{content:'';position:absolute;inset:-6px;border-radius:50%;border:3px solid var(--gold);box-shadow:0 0 14px var(--goldGlow),0 0 30px rgba(232,185,74,.2),inset 0 0 10px rgba(232,185,74,.12);animation:ringpulse 1.3s ease-in-out infinite;z-index:1}
-  @keyframes ringpulse{50%{box-shadow:0 0 22px rgba(232,185,74,.6),0 0 40px rgba(232,185,74,.25),inset 0 0 14px rgba(232,185,74,.18)}}
+  .seat.active .avwrap::after{content:'';position:absolute;inset:-5px;border-radius:50%;border:2.5px solid rgba(255,255,255,.7);box-shadow:0 0 10px rgba(255,255,255,.25);animation:ringpulse 1.5s ease-in-out infinite;z-index:1}
+  @keyframes ringpulse{50%{border-color:rgba(255,255,255,.9);box-shadow:0 0 16px rgba(255,255,255,.35)}}
   .seat.win .avatar{border-color:#4ade80;box-shadow:0 0 16px rgba(74,222,128,.5),0 0 30px rgba(74,222,128,.2)}
   .seat.win{animation:winBounce .5s ease 3}
   @keyframes winBounce{50%{transform:translate(-50%,-50%) translateY(-4px)}}
@@ -98,8 +98,9 @@
   .chips button{padding:8px 12px;font-size:10px;font-family:var(--mono);background:var(--surface);color:var(--text2);border:1px solid var(--border);border-radius:18px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .1s}
   .chips button:active{background:var(--gold);color:#2a1a04}
   .hint{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:5px;min-height:12px;text-align:center}
-  .coach{margin-top:8px;border:1px solid rgba(232,185,74,.22);background:rgba(232,185,74,.03);border-radius:var(--radiusSm);padding:10px 12px;font-size:12px;line-height:1.5;display:none;max-height:45vh;overflow-y:auto}
-  .coach.show{display:block;animation:fadeIn .25s ease;border-left:4px solid var(--gold)}
+  .coach{position:fixed;bottom:calc(var(--tabh) + var(--sab) + 2px);left:4px;right:4px;z-index:50;border:1px solid rgba(232,185,74,.22);background:rgba(17,24,39,.95);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:12px;padding:10px 12px;font-size:12px;line-height:1.5;display:none;max-height:35vh;overflow-y:auto}
+  .coach.show{display:block;animation:slideUp .25s ease;border-left:4px solid var(--gold)}
+  @keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
   @keyframes fadeIn{from{opacity:0}to{opacity:1}}
   .coach .lead{color:var(--gold);font-weight:700;font-family:var(--mono);font-size:11px}
   .coach .num{font-family:var(--mono);color:var(--blue)}
@@ -119,8 +120,8 @@
   .strategy-bar{display:flex;height:14px;border-radius:3px;overflow:hidden;margin:3px 0;border:1px solid var(--border)}
   .strategy-bar div{display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;font-weight:700;color:#fff}
   .strat-fold{background:#5c2626}.strat-call{background:#1f7a4e}.strat-raise{background:#d4a546;color:#2a1a04}
-  .solver-report{margin-top:8px;border:1px solid rgba(52,152,219,.28);background:rgba(52,152,219,.03);border-radius:var(--radiusSm);padding:10px 12px;display:none;max-height:38vh;overflow-y:auto}
-  .solver-report.show{display:block;animation:fadeIn .2s ease}
+  .solver-report{position:fixed;bottom:calc(var(--tabh) + var(--sab) + 2px);left:4px;right:4px;z-index:50;border:1px solid rgba(52,152,219,.28);background:rgba(17,24,39,.95);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:12px;padding:10px 12px;display:none;max-height:35vh;overflow-y:auto}
+  .solver-report.show{display:block;animation:slideUp .2s ease}
   .solver-report h3{font-size:11px;font-weight:700;color:var(--blue);margin-bottom:4px}
   .freq-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin:4px 0}
   .freq-cell{background:var(--surface2);border-radius:5px;padding:5px 3px;text-align:center;border:1px solid var(--border)}
@@ -211,9 +212,9 @@
       <button data-pot="0.33">⅓</button><button data-pot="0.5">½</button><button data-pot="0.66">⅔</button><button data-pot="0.75">¾</button><button data-pot="1">1x</button><button data-pot="1.5">超池</button><button data-pot="allin">All-in</button>
     </div>
     <div class="hint" id="hint"></div>
-    <div class="coach" id="coach"></div>
-    <div class="solver-report" id="solverReport"></div>
   </div>
+  <div class="coach" id="coach"></div>
+  <div class="solver-report" id="solverReport"></div>
 </div>
 <div class="tabcontent" id="tabStats">
   <div class="panel"><h2>资金曲线</h2><div id="tracker"></div></div>

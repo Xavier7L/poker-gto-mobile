@@ -96,15 +96,16 @@
   .sizer{display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px 14px;background:var(--surface2);border-radius:20px;border:1px solid var(--border)}
   .sizer input[type=range]{flex:1;accent-color:var(--gold);height:6px}
   .sizer .amt{font-family:var(--mono);font-size:13px;color:var(--gold);min-width:60px;font-weight:700}
-  .chips{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:4px;z-index:8;padding:4px 8px;background:rgba(0,0,0,.35);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-radius:20px;border:1px solid rgba(255,255,255,.06)}
+  .chips{display:flex;gap:4px}
   .chips button{padding:6px 10px;font-size:9px;font-family:var(--mono);background:rgba(30,42,54,.7);color:var(--text2);border:1px solid rgba(255,255,255,.08);border-radius:14px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .1s}
   .chips button:active{background:var(--gold);color:#2a1a04;border-color:var(--gold)}
   .hint{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:5px;min-height:12px;text-align:center}
-  .cwrap{position:absolute;left:6px;top:50%;transform:translateY(-50%);width:42px;height:42px;touch-action:none;user-select:none;-webkit-user-select:none;z-index:10}
-  .cicon{width:42px;height:42px;border-radius:50%;background:rgba(17,24,39,.65);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(232,185,74,.35);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.45);transition:transform .15s ease}
+  .table-bar{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px;padding:4px 10px;background:rgba(0,0,0,.4);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:24px;border:1px solid rgba(255,255,255,.07);z-index:10;box-shadow:0 4px 20px rgba(0,0,0,.35)}
+  .cwrap{position:relative;width:36px;height:36px;flex-shrink:0;touch-action:none;user-select:none;-webkit-user-select:none}
+  .cicon{width:36px;height:36px;border-radius:50%;background:rgba(17,24,39,.5);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(232,185,74,.35);display:flex;align-items:center;justify-content:center;font-size:19px;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.3);transition:transform .15s ease}
   .cicon:active{transform:scale(.92)}
   .cicon .cdot{position:absolute;top:4px;right:4px;width:8px;height:8px;background:var(--gold);border-radius:50%;box-shadow:0 0 6px var(--gold);display:none}
-  .coach{position:absolute;top:50%;left:50px;transform:translateY(-50%);width:240px;max-height:50vh;overflow-y:auto;background:rgba(17,24,39,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(232,185,74,.22);border-radius:14px;padding:28px 12px 10px 12px;font-size:11px;line-height:1.4;display:none;box-shadow:0 8px 32px rgba(0,0,0,.55);z-index:10}
+  .coach{position:absolute;bottom:44px;left:-8px;width:250px;max-height:50vh;overflow-y:auto;background:rgba(17,24,39,.85);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(232,185,74,.22);border-radius:14px;padding:28px 12px 10px 12px;font-size:11px;line-height:1.4;display:none;box-shadow:0 8px 32px rgba(0,0,0,.55);z-index:20}
   .cwrap.expanded .coach{display:block;animation:slideUp .2s ease}
   .cwrap:not(.expanded) .coach{display:none}
   .cwrap.expanded .cicon .cdot{display:none}
@@ -208,13 +209,15 @@
 <div class="tabcontent active" id="tabTable">
   <div class="table-area">
     <div class="tablewrap" id="table"></div>
-    <div class="chips" id="chipBar">
-      <button data-pot="0.33">⅓</button><button data-pot="0.5">½</button><button data-pot="0.66">⅔</button><button data-pot="0.75">¾</button><button data-pot="1">1x</button><button data-pot="1.5">超池</button><button data-pot="allin">All-in</button>
-    </div>
-    <div class="cwrap" id="cwrap">
-      <div class="cicon" id="cicon">💡<span class="cdot"></span></div>
-      <span class="coach-x" id="coachX">✕</span>
-      <div class="coach" id="coach"></div>
+    <div class="table-bar">
+      <div class="cwrap" id="cwrap">
+        <div class="cicon" id="cicon">💡<span class="cdot"></span></div>
+        <span class="coach-x" id="coachX">✕</span>
+        <div class="coach" id="coach"></div>
+      </div>
+      <div class="chips" id="chipBar">
+        <button data-pot="0.33">⅓</button><button data-pot="0.5">½</button><button data-pot="0.66">⅔</button><button data-pot="0.75">¾</button><button data-pot="1">1x</button><button data-pot="1.5">超池</button><button data-pot="allin">All-in</button>
+      </div>
     </div>
   </div>
   <div class="controls">

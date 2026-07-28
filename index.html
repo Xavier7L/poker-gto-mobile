@@ -82,7 +82,7 @@
   .seat .bet::before{content:'';width:8px;height:8px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe0e0,#e0493c 50%,#8b1a1a);box-shadow:0 0 4px rgba(224,73,60,.3)}
   .seat.hero .bet{top:-76px}.seat.top .bet{top:auto;bottom:-18px}
   .seat.top{top:18%!important}
-  .controls{background:linear-gradient(180deg,var(--surface) 0%,#0d1520 100%);border:1px solid var(--border);border-top:2px solid rgba(232,185,74,.15);border-radius:16px 16px 0 0;padding:8px 10px;margin-top:4px;flex-shrink:1}
+  .controls{background:linear-gradient(180deg,var(--surface) 0%,#0d1520 100%);border:1px solid var(--border);border-top:2px solid rgba(232,185,74,.15);border-radius:16px 16px 0 0;padding:8px 10px 20px;margin-top:4px;flex-shrink:1}
   .actrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   button.gbtn{font-family:var(--sans);font-weight:700;border:none;padding:12px 8px;border-radius:22px;cursor:pointer;font-size:13px;transition:all .12s;-webkit-tap-highlight-color:transparent;letter-spacing:.02em;text-shadow:0 1px 2px rgba(0,0,0,.3);position:relative;overflow:hidden}
   button.gbtn:active:not(:disabled){transform:scale(.96);filter:brightness(1.1)}
@@ -99,14 +99,13 @@
   .chips button{padding:8px 12px;font-size:10px;font-family:var(--mono);background:var(--surface);color:var(--text2);border:1px solid var(--border);border-radius:18px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .1s}
   .chips button:active{background:var(--gold);color:#2a1a04}
   .hint{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:5px;min-height:12px;text-align:center}
-  .cwrap{position:fixed;bottom:calc(var(--tabh) + var(--sab) + 14px);left:10px;z-index:55;touch-action:none;user-select:none;-webkit-user-select:none;transition:transform .05s linear}
-  .cicon{width:52px;height:52px;border-radius:50%;background:rgba(17,24,39,.65);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(232,185,74,.35);display:flex;align-items:center;justify-content:center;font-size:26px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.45);transition:transform .15s ease,box-shadow .15s ease}
+  .cwrap{position:relative;width:52px;height:52px;margin:0 auto 8px;touch-action:none;user-select:none;-webkit-user-select:none}
+  .cicon{width:52px;height:52px;border-radius:50%;background:rgba(17,24,39,.65);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(232,185,74,.35);display:flex;align-items:center;justify-content:center;font-size:26px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.45);transition:transform .15s ease}
   .cicon:active{transform:scale(.92)}
   .cicon .cdot{position:absolute;top:4px;right:4px;width:8px;height:8px;background:var(--gold);border-radius:50%;box-shadow:0 0 6px var(--gold);display:none}
-  .coach{position:absolute;bottom:0;left:0;width:270px;max-height:55vh;overflow-y:auto;background:rgba(17,24,39,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(232,185,74,.22);border-radius:14px;padding:28px 12px 10px 12px;font-size:11px;line-height:1.4;display:none;box-shadow:0 8px 32px rgba(0,0,0,.55)}
+  .coach{position:absolute;bottom:60px;left:50%;transform:translateX(-50%);width:270px;max-height:55vh;overflow-y:auto;background:rgba(17,24,39,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(232,185,74,.22);border-radius:14px;padding:28px 12px 10px 12px;font-size:11px;line-height:1.4;display:none;box-shadow:0 8px 32px rgba(0,0,0,.55);z-index:10}
   .cwrap.expanded .coach{display:block;animation:slideUp .2s ease}
   .cwrap:not(.expanded) .coach{display:none}
-  .cwrap.expanded .cicon{position:absolute;bottom:6px;left:6px;width:28px;height:28px;font-size:14px;background:rgba(17,24,39,.5);border-color:rgba(232,185,74,.2);z-index:2;box-shadow:none}
   .cwrap.expanded .cicon .cdot{display:none}
   .coach-x{position:absolute;top:7px;right:10px;font-size:15px;color:var(--text3);cursor:pointer;line-height:1;padding:2px 4px;z-index:3;display:none}
   .cwrap.expanded .coach-x{display:block}
@@ -208,6 +207,11 @@
 <div class="tabcontent active" id="tabTable">
   <div class="tablewrap" id="table"></div>
   <div class="controls">
+    <div class="cwrap" id="cwrap">
+      <div class="cicon" id="cicon">💡<span class="cdot"></span></div>
+      <span class="coach-x" id="coachX">✕</span>
+      <div class="coach" id="coach"></div>
+    </div>
     <div class="actrow" id="actrow">
       <button class="gbtn fold" id="bFold">弃牌</button>
       <button class="gbtn call" id="bCheck">过牌</button>
@@ -225,11 +229,6 @@
       <button data-pot="0.33">⅓</button><button data-pot="0.5">½</button><button data-pot="0.66">⅔</button><button data-pot="0.75">¾</button><button data-pot="1">1x</button><button data-pot="1.5">超池</button><button data-pot="allin">All-in</button>
     </div>
     <div class="hint" id="hint"></div>
-  </div>
-  <div class="cwrap" id="cwrap">
-    <div class="cicon" id="cicon">💡<span class="cdot"></span></div>
-    <span class="coach-x" id="coachX">✕</span>
-    <div class="coach" id="coach"></div>
   </div>
   <div class="solver-report" id="solverReport"></div>
 </div>
@@ -1667,7 +1666,7 @@ if (typeof document !== 'undefined' && document.addEventListener) {
   });
 }
 
-// Coach draggable + expand/collapse
+// Coach expand/collapse
 (function() {
   if (typeof document === 'undefined') return;
   document.addEventListener('DOMContentLoaded', function() {
@@ -1676,34 +1675,11 @@ if (typeof document !== 'undefined' && document.addEventListener) {
     var coachEl = document.getElementById('coach');
     var coachX = document.getElementById('coachX');
     if (!wrap || !icon) return;
-    var dragging = false, moved = false, sx = 0, sy = 0, bx = 0, by = 0;
 
-    icon.addEventListener('pointerdown', function(e) {
-      if (e.target === coachX || (coachX && coachX.contains(e.target))) return;
-      dragging = true; moved = false;
-      sx = e.clientX; sy = e.clientY;
-      var r = wrap.getBoundingClientRect();
-      bx = r.left; by = r.top;
-      wrap.setPointerCapture(e.pointerId);
-      wrap.style.transition = 'none';
+    icon.addEventListener('click', function(e) {
       e.preventDefault();
+      wrap.classList.toggle('expanded');
     });
-    icon.addEventListener('pointermove', function(e) {
-      if (!dragging) return;
-      var dx = e.clientX - sx, dy = e.clientY - sy;
-      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
-      var nx = Math.max(0, Math.min(window.innerWidth - 56, bx + dx));
-      var ny = Math.max(0, Math.min(window.innerHeight - 56, by + dy));
-      wrap.style.left = nx + 'px'; wrap.style.top = ny + 'px';
-      wrap.style.right = 'auto'; wrap.style.bottom = 'auto';
-    });
-    icon.addEventListener('pointerup', function(e) {
-      if (!dragging) return;
-      dragging = false;
-      wrap.style.transition = '';
-      if (!moved) wrap.classList.toggle('expanded');
-    });
-    icon.addEventListener('pointercancel', function() { dragging = false; wrap.style.transition = ''; });
 
     // Close (✕) hides coach fully
     if (coachX) {

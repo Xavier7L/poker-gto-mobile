@@ -39,6 +39,7 @@
   .tabbar button .ico{font-size:16px;line-height:1}
   .tabbar button.active{color:var(--gold)}
   .tabbar button:active{opacity:.6}
+  .table-area{position:relative;flex-shrink:0;display:flex;align-items:center;justify-content:center}
   .tablewrap{position:relative;background:radial-gradient(ellipse 90% 55% at 50% 46%,rgba(255,255,255,.06) 0%,transparent 60%),radial-gradient(ellipse 100% 65% at 50% 48%,#12a06e 0%,var(--felt1) 30%,var(--felt2) 60%,var(--felt3) 100%);border:9px solid #1e2a36;border-radius:50%;box-shadow:inset 0 0 60px rgba(0,0,0,.3),0 8px 40px rgba(0,0,0,.5);width:94vw;max-width:100%;height:68vh;flex-shrink:0;overflow:visible}
   .tablewrap::after{content:'';position:absolute;inset:12px;border:1px solid rgba(255,255,255,.04);border-radius:50%;pointer-events:none}
   .tablewrap::before{content:'';position:absolute;inset:0;border-radius:50%;background:repeating-conic-gradient(rgba(255,255,255,.008) 0deg 1deg,transparent 1deg 3deg);pointer-events:none}
@@ -95,11 +96,11 @@
   .sizer{display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px 14px;background:var(--surface2);border-radius:20px;border:1px solid var(--border)}
   .sizer input[type=range]{flex:1;accent-color:var(--gold);height:6px}
   .sizer .amt{font-family:var(--mono);font-size:13px;color:var(--gold);min-width:60px;font-weight:700}
-  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
-  .chips button{padding:8px 12px;font-size:10px;font-family:var(--mono);background:var(--surface);color:var(--text2);border:1px solid var(--border);border-radius:18px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .1s}
-  .chips button:active{background:var(--gold);color:#2a1a04}
+  .chips{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:4px;z-index:8;padding:4px 8px;background:rgba(0,0,0,.35);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-radius:20px;border:1px solid rgba(255,255,255,.06)}
+  .chips button{padding:6px 10px;font-size:9px;font-family:var(--mono);background:rgba(30,42,54,.7);color:var(--text2);border:1px solid rgba(255,255,255,.08);border-radius:14px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .1s}
+  .chips button:active{background:var(--gold);color:#2a1a04;border-color:var(--gold)}
   .hint{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:5px;min-height:12px;text-align:center}
-  .cwrap{position:relative;width:52px;height:52px;margin:0 auto 8px;touch-action:none;user-select:none;-webkit-user-select:none}
+  .cwrap{position:relative;width:52px;height:52px;margin:4px auto;touch-action:none;user-select:none;-webkit-user-select:none;flex-shrink:0}
   .cicon{width:52px;height:52px;border-radius:50%;background:rgba(17,24,39,.65);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(232,185,74,.35);display:flex;align-items:center;justify-content:center;font-size:26px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.45);transition:transform .15s ease}
   .cicon:active{transform:scale(.92)}
   .cicon .cdot{position:absolute;top:4px;right:4px;width:8px;height:8px;background:var(--gold);border-radius:50%;box-shadow:0 0 6px var(--gold);display:none}
@@ -205,13 +206,18 @@
   </div>
 </div>
 <div class="tabcontent active" id="tabTable">
-  <div class="tablewrap" id="table"></div>
-  <div class="controls">
-    <div class="cwrap" id="cwrap">
-      <div class="cicon" id="cicon">💡<span class="cdot"></span></div>
-      <span class="coach-x" id="coachX">✕</span>
-      <div class="coach" id="coach"></div>
+  <div class="table-area">
+    <div class="tablewrap" id="table"></div>
+    <div class="chips" id="chipBar">
+      <button data-pot="0.33">⅓</button><button data-pot="0.5">½</button><button data-pot="0.66">⅔</button><button data-pot="0.75">¾</button><button data-pot="1">1x</button><button data-pot="1.5">超池</button><button data-pot="allin">All-in</button>
     </div>
+  </div>
+  <div class="cwrap" id="cwrap">
+    <div class="cicon" id="cicon">💡<span class="cdot"></span></div>
+    <span class="coach-x" id="coachX">✕</span>
+    <div class="coach" id="coach"></div>
+  </div>
+  <div class="controls">
     <div class="actrow" id="actrow">
       <button class="gbtn fold" id="bFold">弃牌</button>
       <button class="gbtn call" id="bCheck">过牌</button>
@@ -224,9 +230,6 @@
     <div class="sizer" id="sizer">
       <input type="range" id="slider" min="0" max="100" value="50">
       <span class="amt" id="sizeAmt">—</span>
-    </div>
-    <div class="chips">
-      <button data-pot="0.33">⅓</button><button data-pot="0.5">½</button><button data-pot="0.66">⅔</button><button data-pot="0.75">¾</button><button data-pot="1">1x</button><button data-pot="1.5">超池</button><button data-pot="allin">All-in</button>
     </div>
     <div class="hint" id="hint"></div>
   </div>

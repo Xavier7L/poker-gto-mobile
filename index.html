@@ -98,9 +98,19 @@
   .chips button{padding:8px 12px;font-size:10px;font-family:var(--mono);background:var(--surface);color:var(--text2);border:1px solid var(--border);border-radius:18px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .1s}
   .chips button:active{background:var(--gold);color:#2a1a04}
   .hint{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:5px;min-height:12px;text-align:center}
-  .coach{position:fixed;bottom:calc(var(--tabh) + var(--sab) + 2px);left:4px;right:4px;z-index:50;border:1px solid rgba(232,185,74,.22);background:rgba(17,24,39,.95);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:12px;padding:8px 30px 8px 12px;font-size:11px;line-height:1.4;display:none;max-height:80px;overflow-y:auto;cursor:pointer}
-  .coach.show{display:block;animation:slideUp .25s ease;border-left:4px solid var(--gold)}
-  .coach::after{content:'✕';position:absolute;top:6px;right:10px;font-size:14px;color:var(--text3);cursor:pointer;line-height:1}
+  .cwrap{position:fixed;bottom:calc(var(--tabh) + var(--sab) + 14px);right:10px;z-index:55;touch-action:none;user-select:none;-webkit-user-select:none;transition:transform .05s linear}
+  .cicon{width:42px;height:42px;border-radius:50%;background:rgba(17,24,39,.65);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(232,185,74,.35);display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.45);transition:transform .15s ease,box-shadow .15s ease}
+  .cicon:active{transform:scale(.92)}
+  .cicon .cdot{position:absolute;top:4px;right:4px;width:8px;height:8px;background:var(--gold);border-radius:50%;box-shadow:0 0 6px var(--gold);display:none}
+  .coach{position:absolute;bottom:0;right:0;width:270px;max-height:55vh;overflow-y:auto;background:rgba(17,24,39,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(232,185,74,.22);border-radius:14px;padding:28px 12px 10px 12px;font-size:11px;line-height:1.4;display:none;box-shadow:0 8px 32px rgba(0,0,0,.55)}
+  .cwrap.expanded .coach{display:block;animation:slideUp .2s ease}
+  .cwrap:not(.expanded) .coach{display:none}
+  .cwrap.expanded .cicon{position:absolute;bottom:6px;right:6px;width:26px;height:26px;font-size:13px;background:rgba(17,24,39,.5);border-color:rgba(232,185,74,.2);z-index:2;box-shadow:none}
+  .cwrap.expanded .cicon .cdot{display:none}
+  .coach-x{position:absolute;top:7px;right:10px;font-size:15px;color:var(--text3);cursor:pointer;line-height:1;padding:2px 4px;z-index:3;display:none}
+  .cwrap.expanded .coach-x{display:block}
+  .coach-x:active{color:var(--text)}
+  .coach.show{}
   @keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
   @keyframes fadeIn{from{opacity:0}to{opacity:1}}
   .coach .lead{color:var(--gold);font-weight:700;font-family:var(--mono);font-size:11px}
@@ -215,7 +225,11 @@
     </div>
     <div class="hint" id="hint"></div>
   </div>
-  <div class="coach" id="coach"></div>
+  <div class="cwrap" id="cwrap">
+    <div class="cicon" id="cicon">💡<span class="cdot"></span></div>
+    <span class="coach-x" id="coachX">✕</span>
+    <div class="coach" id="coach"></div>
+  </div>
   <div class="solver-report" id="solverReport"></div>
 </div>
 <div class="tabcontent" id="tabStats">
@@ -1643,17 +1657,76 @@ document.querySelectorAll('.tabbar button').forEach(function(btn) {
 
 // (touchmove bounce prevention removed - interferes with button taps)
 
-// Haptic feedback on button taps + dismiss coach/solver-report on tap
+// Haptic feedback on button taps
 if (typeof document !== 'undefined' && document.addEventListener) {
   document.addEventListener('click', function(e) {
-    // Dismiss overlays when tapped
-    if (e.target.closest) {
-      var overlay = e.target.closest('.coach, .solver-report');
-      if (overlay) { overlay.classList.remove('show'); return; }
-    }
-    // Haptic feedback on buttons
     if (e.target.closest && e.target.closest('button') && navigator.vibrate) {
       navigator.vibrate(8);
+    }
+  });
+}
+
+// Coach draggable + expand/collapse
+(function() {
+  if (typeof document === 'undefined') return;
+  document.addEventListener('DOMContentLoaded', function() {
+    var wrap = document.getElementById('cwrap');
+    var icon = document.getElementById('cicon');
+    var coachEl = document.getElementById('coach');
+    var coachX = document.getElementById('coachX');
+    if (!wrap || !icon) return;
+    var dragging = false, moved = false, sx = 0, sy = 0, bx = 0, by = 0;
+
+    icon.addEventListener('pointerdown', function(e) {
+      if (e.target === coachX || (coachX && coachX.contains(e.target))) return;
+      dragging = true; moved = false;
+      sx = e.clientX; sy = e.clientY;
+      var r = wrap.getBoundingClientRect();
+      bx = r.left; by = r.top;
+      wrap.setPointerCapture(e.pointerId);
+      wrap.style.transition = 'none';
+      e.preventDefault();
+    });
+    icon.addEventListener('pointermove', function(e) {
+      if (!dragging) return;
+      var dx = e.clientX - sx, dy = e.clientY - sy;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
+      var nx = Math.max(0, Math.min(window.innerWidth - 46, bx + dx));
+      var ny = Math.max(0, Math.min(window.innerHeight - 46, by + dy));
+      wrap.style.left = nx + 'px'; wrap.style.top = ny + 'px';
+      wrap.style.right = 'auto'; wrap.style.bottom = 'auto';
+    });
+    icon.addEventListener('pointerup', function(e) {
+      if (!dragging) return;
+      dragging = false;
+      wrap.style.transition = '';
+      if (!moved) wrap.classList.toggle('expanded');
+    });
+    icon.addEventListener('pointercancel', function() { dragging = false; wrap.style.transition = ''; });
+
+    // Close (✕) hides coach fully
+    if (coachX) {
+      coachX.addEventListener('click', function(e) {
+        e.stopPropagation();
+        coachEl.classList.remove('show');
+        wrap.classList.remove('expanded');
+      });
+    }
+
+    // Show dot when coach has content
+    var obs = new MutationObserver(function() {
+      var dot = icon.querySelector('.cdot');
+      if (dot) dot.style.display = coachEl.classList.contains('show') ? 'block' : 'none';
+    });
+    obs.observe(coachEl, { attributes: true, attributeFilter: ['class'] });
+  });
+})();
+
+// Solver-report: tap to dismiss
+if (typeof document !== 'undefined' && document.addEventListener) {
+  document.addEventListener('click', function(e) {
+    if (e.target.closest && e.target.closest('.solver-report')) {
+      e.target.closest('.solver-report').classList.remove('show');
     }
   });
 }

@@ -98,8 +98,9 @@
   .chips button{padding:8px 12px;font-size:10px;font-family:var(--mono);background:var(--surface);color:var(--text2);border:1px solid var(--border);border-radius:18px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:all .1s}
   .chips button:active{background:var(--gold);color:#2a1a04}
   .hint{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:5px;min-height:12px;text-align:center}
-  .coach{position:fixed;bottom:calc(var(--tabh) + var(--sab) + 2px);left:4px;right:4px;z-index:50;border:1px solid rgba(232,185,74,.22);background:rgba(17,24,39,.95);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:12px;padding:10px 12px;font-size:12px;line-height:1.5;display:none;max-height:35vh;overflow-y:auto}
+  .coach{position:fixed;bottom:calc(var(--tabh) + var(--sab) + 2px);left:4px;right:4px;z-index:50;border:1px solid rgba(232,185,74,.22);background:rgba(17,24,39,.95);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:12px;padding:8px 30px 8px 12px;font-size:11px;line-height:1.4;display:none;max-height:80px;overflow-y:auto;cursor:pointer}
   .coach.show{display:block;animation:slideUp .25s ease;border-left:4px solid var(--gold)}
+  .coach::after{content:'✕';position:absolute;top:6px;right:10px;font-size:14px;color:var(--text3);cursor:pointer;line-height:1}
   @keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
   @keyframes fadeIn{from{opacity:0}to{opacity:1}}
   .coach .lead{color:var(--gold);font-weight:700;font-family:var(--mono);font-size:11px}
@@ -120,8 +121,9 @@
   .strategy-bar{display:flex;height:14px;border-radius:3px;overflow:hidden;margin:3px 0;border:1px solid var(--border)}
   .strategy-bar div{display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:8px;font-weight:700;color:#fff}
   .strat-fold{background:#5c2626}.strat-call{background:#1f7a4e}.strat-raise{background:#d4a546;color:#2a1a04}
-  .solver-report{position:fixed;bottom:calc(var(--tabh) + var(--sab) + 2px);left:4px;right:4px;z-index:50;border:1px solid rgba(52,152,219,.28);background:rgba(17,24,39,.95);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:12px;padding:10px 12px;display:none;max-height:35vh;overflow-y:auto}
+  .solver-report{position:fixed;bottom:calc(var(--tabh) + var(--sab) + 2px);left:4px;right:4px;z-index:50;border:1px solid rgba(52,152,219,.28);background:rgba(17,24,39,.95);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:12px;padding:8px 30px 8px 12px;font-size:11px;display:none;max-height:80px;overflow-y:auto;cursor:pointer}
   .solver-report.show{display:block;animation:slideUp .2s ease}
+  .solver-report::after{content:'✕';position:absolute;top:6px;right:10px;font-size:14px;color:var(--text3);cursor:pointer;line-height:1}
   .solver-report h3{font-size:11px;font-weight:700;color:var(--blue);margin-bottom:4px}
   .freq-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin:4px 0}
   .freq-cell{background:var(--surface2);border-radius:5px;padding:5px 3px;text-align:center;border:1px solid var(--border)}
@@ -1641,9 +1643,15 @@ document.querySelectorAll('.tabbar button').forEach(function(btn) {
 
 // (touchmove bounce prevention removed - interferes with button taps)
 
-// Haptic feedback on button taps
+// Haptic feedback on button taps + dismiss coach/solver-report on tap
 if (typeof document !== 'undefined' && document.addEventListener) {
   document.addEventListener('click', function(e) {
+    // Dismiss overlays when tapped
+    if (e.target.closest) {
+      var overlay = e.target.closest('.coach, .solver-report');
+      if (overlay) { overlay.classList.remove('show'); return; }
+    }
+    // Haptic feedback on buttons
     if (e.target.closest && e.target.closest('button') && navigator.vibrate) {
       navigator.vibrate(8);
     }

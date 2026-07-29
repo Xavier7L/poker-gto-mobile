@@ -83,6 +83,7 @@
   .seat .bet::before{content:'';width:8px;height:8px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe0e0,#e0493c 50%,#8b1a1a);box-shadow:0 0 4px rgba(224,73,60,.3)}
   .seat.hero .bet{top:-76px}.seat.top .bet{top:auto;bottom:-18px}
   .seat.top{top:18%!important}
+  .seat.hero{top:80%!important}
   .controls{background:linear-gradient(180deg,var(--surface) 0%,#0d1520 100%);border:1px solid var(--border);border-top:2px solid rgba(232,185,74,.15);border-radius:16px 16px 0 0;padding:8px 10px 20px;margin-top:4px;flex-shrink:1}
   .actrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   button.gbtn{font-family:var(--sans);font-weight:700;border:none;padding:12px 8px;border-radius:22px;cursor:pointer;font-size:13px;transition:all .12s;-webkit-tap-highlight-color:transparent;letter-spacing:.02em;text-shadow:0 1px 2px rgba(0,0,0,.3);position:relative;overflow:hidden}
@@ -693,16 +694,15 @@ function backgroundCFR(heroHole, board, pot, toCall, street){
         const el = document.createElement('div');
         el.className = 'cfr-result';
         el.style.cssText = 'margin-top:5px;padding:5px 8px;background:rgba(33,150,243,.10);border-left:3px solid #2196f3;border-radius:4px;font-size:10px;color:#64b5f6';
-        let html = '<b>🧮 CFR实时求解:</b> ';
+        let html = '<b>🧮 深度分析:</b> ';
         if(result.evBet !== undefined){
           const betBetter = result.evBet > result.evCheck;
-          html += betBetter ? '下注EV更高' : '过牌EV更高';
-          html += ` (下注率${(result.betFreq*100)|0}%, 价值比${(result.valBetRatio*100)|0}%/诈唬${(result.bluffRatio*100)|0}%)`;
+          html += betBetter ? '下注更优' : '过牌更优';
+          html += `（${(result.betFreq*100)|0}%的情况应下注，价值占${(result.valBetRatio*100)|0}%）`;
         }
         if(result.toCallAction){
-          html += ` 面对下注: ${result.toCallAction} (EV: ${result.toCallEV.toFixed(1)})`;
+          html += ` 面对下注建议: ${result.toCallAction}`;
         }
-        html += ` <span style="color:var(--text3)">[${result.nH||'?'}×${result.nV||'?'}范围, ${result.iters}迭代]</span>`;
         el.innerHTML = html;
         const details = co.querySelector('.coach-details');
         if(details) details.parentNode.insertBefore(el, details);
@@ -1586,14 +1586,14 @@ function showCoach(){
       const maxBoardRank = Math.max(...G.board.map(c=>c.rank));
       const isNuts = (myCat >= 4) || (myCat === 3) || (myCat === 2 && myScore[1] === maxBoardRank && myScore[2] >= maxBoardRank - 1 && tex.type !== 'wet');
       if (!isNuts && spr.spr > 2) {
-        rec = '弃牌 Fold'; verdict = 'bad';
-        why = `面对翻后加注(Re-raise)，对手范围极度极化(polarized)——约90%是坚果(nuts)。你的牌力 <b>${CATS[myCat]}</b> 不在继续范围(continuing range)内，精准胜率仅 <b>${eqP}%</b>，远低于防守所需的底池赔率(pot odds)。`;
+        rec = '弃牌'; verdict = 'bad';
+        why = `面对再加注，对手90%的情况是超强牌。你的 <b>${CATS[myCat]}</b> 胜率仅 <b>${eqP}%</b>，跟注会亏很多。弃牌是正确的。`;
       } else if (isNuts) {
-        recAmt = p.bet + p.stack; rec = '全下 All-in (坚果 Nuts)'; verdict = 'ok';
-        why = `你持有坚果牌(Nuts)！面对对手加注(Re-raise)，直接全下(All-in)最大化价值(Value)。你的范围顶端(top of range)对抗对手极化范围有巨大优势。`;
+        recAmt = p.bet + p.stack; rec = '全下！'; verdict = 'ok';
+        why = `你有超强牌！面对加注，直接全下拿最大价值。你的牌几乎不可能输。`;
       } else {
-        rec = '跟注 Call (低SPR打光 Stack-off)'; verdict = 'warn';
-        why = `SPR(筹码底池比)极低(${spr.spr})，底池赔率(pot odds)合适，用 <b>${CATS[myCat]}</b> 跟注(Call)打光。低SPR时中等牌力也可以全下。`;
+        rec = '跟注（低SPR打光）'; verdict = 'warn';
+        why = `底池赔率合适(SPR=${spr.spr})，用 <b>${CATS[myCat]}</b> 跟注打光。筹码不深时中等牌也可以全下。`;
       }
     }
     else if(G.street==='preflop'){
@@ -1662,59 +1662,58 @@ function showCoach(){
           const shouldBet = pio.a === 'bet' ? (Math.random() < pio.f) : pio.a === 'check' ? (pio.bf && Math.random() < pio.bf) : false;
           if(shouldBet && (G.street==='turn'||G.street==='river') && handCat==='nuts' && opp<=2 && p.stack>pot*1.5){
             const overbetAmt = Math.min(p.stack, Math.round(pot*1.5/5)*5);
-            recAmt=overbetAmt; rec=`超池下注 Overbet ${overbetAmt} (1.5x Pot)`; verdict='ok';
-            why=`<b>坚果优势(Nut Advantage)！</b>PioSOLVER: 超池下注获取最大价值。手牌分类 <b>${handCat}</b>，${tex.note}。胜率 ${eqP}%，对手范围顶端远弱于你。`;
+            recAmt=overbetAmt; rec=`超池下注 ${overbetAmt}`; verdict='ok';
+            why=`<b>你有绝对优势！</b>牌力极强，下大注获取最大价值。胜率 ${eqP}%，对手几乎不可能比你强。`;
           } else if(shouldBet){
             const pioSize = pio.s || 0.50;
             const pioAmt = Math.min(Math.max(BB_AMT, Math.round(pot*pioSize/5)*5), p.stack);
             const szLbl = pioSize<=0.25?'¼ Pot':pioSize<=0.33?'⅓ Pot':pioSize<=0.50?'½ Pot':pioSize<=0.66?'⅔ Pot':pioSize<=0.75?'¾ Pot':'Pot';
-            recAmt=pioAmt; rec=`下注 Bet ${pioAmt} (${szLbl})`; verdict='ok';
-            why=`📊 PioSOLVER: ${tex.note}，手牌分类 <b>${handCat}</b> → 下注 ${(pioSize*100)|0}%pot (${(pio.f*100)|0}%频率)。${handCat==='nuts'||handCat==='topPair'?'价值下注(Value Bet)提取最大价值。':handCat==='strongDraw'?'半诈唬(Semi-Bluff)兼顾弃牌率和中牌价值。':'利用范围优势(Range Advantage)施压。'}`;
+            recAmt=pioAmt; rec=`下注 ${pioAmt}`; verdict='ok';
+            why=`${tex.note}。你的牌属于<b>${handCat==='nuts'||handCat==='topPair'?'强牌范围，下注拿价值':handCat==='strongDraw'?'听牌，下注半诈唬':'可下注的范围'}</b>。建议下注${(pioSize*100)|0}%底池，GTO在${(pio.f*100)|0}%的类似情况下这样打。`;
           } else {
-            rec='过牌 Check'; verdict=handCat==='nuts'||handCat==='topPair'?'ok':'warn';
+            rec='过牌'; verdict=handCat==='nuts'||handCat==='topPair'?'ok':'warn';
             const checkFreq = pio.a==='bet' ? ((1-pio.f)*100)|0 : pio.a==='check' ? (pio.bf ? ((1-pio.bf)*100)|0 : 100) : 100;
-            why=`📊 PioSOLVER: ${tex.note}，手牌分类 <b>${handCat}</b> → 过牌(Pio约${checkFreq}%过牌)。${pio.a==='check'&&pio.bf?`混合策略中有时(${(pio.bf*100)|0}%)可下注作为bluff。`:'范围平衡(Balanced Range)，保留摊牌价值(Showdown Value)。'}`;
-            if(handCat==='nuts'||handCat==='topPair') why += ` 控池(Pot Control)让对手在后续街犯错。`;
+            why=`${tex.note}。你的牌属于<b>${handCat==='nuts'||handCat==='topPair'?'强牌范围':handCat==='midPair'?'中等牌力':handCat==='weakPair'?'弱对子':'较弱范围'}</b>，GTO建议过牌（约${checkFreq}%的情况）。${pio.a==='check'&&pio.bf?'有时会混合下注作为诈唬。':'控制底池大小，保留摊牌价值。'}`;
+            if(handCat==='nuts'||handCat==='topPair') why += ' 强牌过牌是策略性的，让对手在后续街犯错。';
           }
         } else {
         // Fallback: Monte Carlo heuristics
         if((G.street==='turn'||G.street==='river') && eq>=0.72 && opp<=2 && p.stack>pot*1.5){
           const overbetAmt = Math.min(p.stack, Math.round(pot*1.5/5)*5);
-          recAmt=overbetAmt; rec=`超池下注 Overbet ${overbetAmt} (1.5x Pot)`; verdict='ok';
-          why=`<b>坚果优势(Nut Advantage)！</b>胜率 ${eqP}% 极高，GTO推荐超池下注(Overbet)获取最大价值(Max Value)。当你的范围顶端比对手强很多时，大注可以最大化底池收益。对手跟注范围(Calling Range)里最差的牌就是你范围的底线。`;
+          recAmt=overbetAmt; rec=`超池下注 ${overbetAmt}`; verdict='ok';
+          why=`<b>牌力极强！</b>胜率 ${eqP}%，对手几乎不可能赢你。下大注获取最大价值。`;
         } else if(eq >= fairShare+0.18 && eq >= 0.55){
-          recAmt=bStd; rec=`价值下注 Value Bet ${bStd}`; verdict='ok';
-          why=`胜率(Equity) <b>${eqP}%</b> 远高于公平份额(Fair Share) ${fsP}%。${tex.note}。SPR(筹码底池比)=${spr.spr}，建议下注获取价值(Value)。`;
+          recAmt=bStd; rec=`价值下注 ${bStd}`; verdict='ok';
+          why=`胜率 <b>${eqP}%</b> 远高于平均(${fsP}%)。${tex.note}。你的牌很可能领先，下注拿价值。`;
         } else if(draw && (draw.flush||draw.oesd) && evBet>(evCall||0)+2 && opp<=1){
-          recAmt=bStd; rec=`半诈唬下注 Semi-Bluff ${bStd}`; verdict='ok';
-          why=`强听牌(Strong Draw)——${draw.flush?'同花听牌(Flush Draw, 9张补牌/Outs)':'两头顺听牌(OESD, 8张补牌/Outs)'}，弃牌率(Fold Equity) ${(fe*100|0)}%。下注可立即赢池(Win Pot Now)或中牌赢大底池，双向正期望(+EV)。`;
+          recAmt=bStd; rec=`半诈唬下注 ${bStd}`; verdict='ok';
+          why=`${draw.flush?'同花听牌(9张补牌)':'两头顺听牌(8张补牌)'}，弃牌率约 ${(fe*100|0)}%。下注可以立刻赢，或者中牌赢大底池。`;
         } else if(cbetSpot && tex.type!=='preflop' && GTO_CBET[tex.type]>=0.50 && eq>=0.30){
           const cbetFreq = GTO_CBET[tex.type]||0.50;
           const cbetSize = tex.type==='mono'?0.25:tex.type==='wet'||tex.type==='high_connected'?0.66:tex.type==='paired_wet'?0.50:0.33;
           if(mixRoll('flop', cbetFreq)){
-            const sizeLabel = cbetSize<=0.33?'⅓ Pot':cbetSize<=0.50?'½ Pot':'⅔ Pot';
             recAmt=Math.min(Math.max(BB_AMT,Math.round(pot*cbetSize/5)*5),p.stack);
-            rec=`持续下注 Cbet ${recAmt} (${sizeLabel})`; verdict='ok';
-            why=`翻前加注者(PFR)在${tex.note}，PioSOLVER以 <b>${(cbetFreq*100|0)}%</b> 频率持续下注@${(cbetSize*100)|0}%pot。本手下注。`;
+            rec=`持续下注 ${recAmt}`; verdict='ok';
+            why=`${tex.note}。你是翻前加注者，在这个牌面应该以 <b>${(cbetFreq*100|0)}%</b> 的频率持续下注。本手下注${(cbetSize*100)|0}%底池。`;
           } else {
-            rec='过牌 Check (混合过牌 Mixed Check)'; verdict='ok';
-            why=`翻前加注者(PFR)在此牌面，PioSOLVER约 <b>${((1-cbetFreq)*100|0)}%</b> 频率过牌保持范围平衡(Range Balance)。本手过牌。`;
+            rec='过牌'; verdict='ok';
+            why=`${tex.note}。这个牌面约 <b>${((1-cbetFreq)*100|0)}%</b> 的时候应该过牌，保持策略平衡。本手过牌。`;
           }
         } else if(eq >= fairShare+0.10){
           if(G.street==='river'){
-            rec='过牌亮牌 Check for Showdown'; verdict='ok';
-            why=`胜率(Equity) <b>${eqP}%</b> 中等偏高，河牌(River)是最后一条街，GTO建议过牌等待摊牌(Showdown)。中等牌力在河牌下注会被更好的牌跟注(Call)、更差的牌弃牌(Fold)——这是最差的结果。过牌保留摊牌价值(Showdown Value)，避免被加注(Bluff Raise)赶出底池。`;
+            rec='过牌等摊牌'; verdict='ok';
+            why=`胜率 <b>${eqP}%</b> 中等偏高。河牌了，下注只会被更好的牌跟、更差的牌跑掉——最差的结果。过牌等摊牌就好。`;
           } else {
-            rec='过牌控池 Pot Control'; verdict='ok';
-            why=`胜率(Equity) <b>${eqP}%</b> 中等偏高，GTO建议过牌控池(Pot Control)。中等牌力下注会被更好的牌跟注(Call)、更差的牌弃牌(Fold)——这是最差的结果。过牌保持底池小，保留摊牌价值(Showdown Value)。`;
+            rec='过牌控池'; verdict='ok';
+            why=`胜率 <b>${eqP}%</b> 中等偏高。中等牌力不适合下注——下注会被更好的牌跟、更差的牌跑掉。过牌控池，保留摊牌价值。`;
           }
         } else {
           if(G.street==='river'){
-            rec='过牌 Check'; verdict='warn';
-            why=`胜率(Equity) <b>${eqP}%</b> < 公平份额(Fair Share) ${fsP}%。河牌(River)是最后一条街，牌力不足以价值下注(Value Bet)，过牌放弃(Give Up)或等待对手摊牌。诈唬(Bluff)需要评估弃牌率(Fold Equity)——如果对手跟注范围(Calling Range)很宽，诈唬无利可图。`;
+            rec='过牌'; verdict='warn';
+            why=`胜率 <b>${eqP}%</b> 偏低。河牌了，牌力不够下注拿价值。过牌放弃或等对手摊牌。`;
           } else {
-            rec='过牌 Check'; verdict='warn';
-            why=`胜率(Equity) <b>${eqP}%</b> < 公平份额(Fair Share) ${fsP}%。牌力不足以价值下注(Value Bet)，过牌(Check)等待后续街改善或寻找诈唬机会(Bluff Spot)。`;
+            rec='过牌'; verdict='warn';
+            why=`胜率 <b>${eqP}%</b> 偏低。牌力不足以价值下注，过牌等后续牌改善。`;
           }
         }
         } // end fallback
@@ -1725,16 +1724,16 @@ function showCoach(){
         const _crCat = _crScore[0];
         const _boardPair = tex.pair;
         const _isTwoPairOnPairedBoard = _boardPair && _crCat===2;
-        const _pairedBoardWarn = _isTwoPairOnPairedBoard ? '⚠️ 配桌面两对(Two Pair on Paired Board)：加注只会被更好的牌(三条/葫芦)跟注，GTO建议跟注抓诈唬(Bluff Catch)。' : '';
+        const _pairedBoardWarn = _isTwoPairOnPairedBoard ? '⚠️ 桌面有对子，你的两对其实没那么强——加注只会被三条或更好的牌跟注，建议跟注抓诈唬。' : '';
         // Donk bet overrides
         if(_isDonkSpot && eq >= 0.55 && eq >= fairShare+0.12){
           const donkRaise = Math.min(p.stack, G.currentBet + Math.max(G.minRaise, Math.round(pot*0.7/5)*5));
-          recAmt=donkRaise; rec=`加注驴式下注 Raise Donk Bet 到 ${donkRaise}`; verdict='ok';
-          why=`<b>面对驴式下注(Donk Bet)！</b>非翻前加注者主动下注通常表示弱牌。GTO建议用强牌(${eqP}%胜率)加注惩罚，最大化价值。`;
+          recAmt=donkRaise; rec=`加注到 ${donkRaise}`; verdict='ok';
+          why=`<b>对手主动下注(驴式下注)！</b>这通常代表弱牌。你有 ${eqP}% 胜率，加注惩罚这种不平衡的打法。`;
         } else if(_isDonkSpot && draw && (draw.flush||draw.oesd) && opp===1){
           const donkRaise = Math.min(p.stack, G.currentBet + Math.max(G.minRaise, Math.round(pot*0.6/5)*5));
-          recAmt=donkRaise; rec=`半诈唬加注驴式 Semi-Bluff Raise Donk 到 ${donkRaise}`; verdict='ok';
-          why=`<b>面对驴式下注(Donk Bet)！</b>Donk bet通常代表弱牌，用强听牌半诈唬加注：①立即赢池 ②中牌赢大底池。双向正期望。`;
+          recAmt=donkRaise; rec=`半诈唬加注到 ${donkRaise}`; verdict='ok';
+          why=`<b>对手驴式下注！</b>通常代表弱牌。你有强听牌，加注可以立刻赢池或中牌赢大底池。`;
         } else if(pio && !_isDonkSpot){
           // === PioSOLVER-first: facing bet ===
           pioUsed = true;
@@ -1752,18 +1751,18 @@ function showCoach(){
             const rs = pio.rs || 2.8;
             const raiseAmt = Math.min(G.currentBet + Math.max(G.minRaise||BB_AMT, Math.round(pot*(rs>3?0.72:rs)/5)*5), p.bet+p.stack);
             if(_isTwoPairOnPairedBoard){
-              rec='跟注 Call (配对面两对)'; verdict='warn';
-              why=`⚠️ PioSOLVER: 配桌面两对(Two Pair on Paired Board)，加注只会被更好的牌跟注。GTO建议跟注抓诈唬。手牌分类 <b>${handCat}</b>，${tex.note}。${_pairedBoardWarn}`;
+              rec='跟注（配桌面两对）'; verdict='warn';
+              why=`⚠️ ${_pairedBoardWarn} 你的牌属于中等强度，跟注抓诈唬就好。`;
             } else {
-              recAmt=raiseAmt; rec=`加注 Raise 到 ${raiseAmt}`; verdict='ok';
-              why=`📊 PioSOLVER: ${tex.note}，手牌分类 <b>${handCat}</b> → 加注 ${rs}x (${(pio.f*100)|0}%频率)。${handCat==='nuts'?'坚果加注获取最大价值(Max Value)。':'价值加注(Value Raise)，建立大底池。'}`;
+              recAmt=raiseAmt; rec=`加注到 ${raiseAmt}`; verdict='ok';
+              why=`${tex.note}。你的牌力足够强，加注获取最大价值。GTO在${(pio.f*100)|0}%的类似情况下加注。`;
             }
           } else if(pioAction === 'call'){
-            rec='跟注 Call'; verdict = (eq*eqCoeff>=potOdds)?'ok':'warn';
-            why=`📊 PioSOLVER: ${tex.note}，手牌分类 <b>${handCat}</b> → 跟注(${(pio.f*100)|0}%频率)。精准胜率 ${eqP}%，底池赔率 ${poP}%。${eq*eqCoeff>=potOdds?'跟注长期盈利(+EV).':'Pio防守范围(Defending Range)内，考虑隐含赔率(Implied Odds).'}${_isTwoPairOnPairedBoard?' '+_pairedBoardWarn:''}${rioInfo.warn?' ⚠️ '+rioInfo.note:''}`;
+            rec='跟注'; verdict = (eq*eqCoeff>=potOdds)?'ok':'warn';
+            why=`${tex.note}。胜率 ${eqP}%，需跟注 ${poP}% 底池。${eq*eqCoeff>=potOdds?'跟注是盈利的。':'跟注在GTO防守范围内，考虑隐含赔率后合理。'}${_isTwoPairOnPairedBoard?' '+_pairedBoardWarn:''}${rioInfo.warn?' ⚠️ '+rioInfo.note:''}`;
           } else {
-            rec='弃牌 Fold'; verdict='bad';
-            why=`📊 PioSOLVER: ${tex.note}，手牌分类 <b>${handCat}</b> → 弃牌(${(pio.f*100)|0}%频率)。精准胜率 ${eqP}% < 底池赔率 ${poP}%，不在Pio防守范围内。跟注长期亏损(-EV)。`;
+            rec='弃牌'; verdict='bad';
+            why=`${tex.note}。胜率 ${eqP}% 低于需要的 ${poP}%（底池赔率）。你的牌不在继续范围内，跟注长期亏损。`;
           }
           if(freqMode && pio.a === 'mixed'){
             const cfP = Math.round((pio.cf||0)*100), rfP = Math.round((pio.rf||0)*100);
@@ -1773,27 +1772,27 @@ function showCoach(){
           // Fallback: Monte Carlo heuristics for facing bet
           const valueRaise = (_isTwoPairOnPairedBoard ? false : _crCat >= 2) || eq >= 0.72;
           if(valueRaise && evRaise!=null && evRaise>evCall){
-            recAmt=RStd; rec=`价值加注 Value Raise 到 ${RStd}`; verdict='ok';
-            why=`胜率 ${eqP}% 明显领先，加注(Raise)获取最大价值。加注EV > 跟注EV。`;
+            recAmt=RStd; rec=`加注到 ${RStd}`; verdict='ok';
+            why=`胜率 ${eqP}% 明显领先，加注拿最大价值。加注比跟注更赚。`;
           } else if(draw && (draw.flush||draw.oesd) && evRaise!=null && evRaise>(evCall||0)+3 && opp===1 && p.stack>toCall*3 && actionLine !== 'vs_reraise'){
-            recAmt=RStd; rec=`半诈唬加注 Semi-Bluff Raise 到 ${RStd}`; verdict='ok';
-            why=`强听牌(Strong Draw) + 加注EV显著高于跟注。半诈唬加注增加弃牌率，保留隐含赔率。`;
+            recAmt=RStd; rec=`半诈唬加注到 ${RStd}`; verdict='ok';
+            why=`你有强听牌，加注可以增加弃牌率，同时保留中牌赢大底池的机会。`;
           } else if(eq * eqCoeff >= potOdds){
             if(freqMode && Math.abs(eq*eqCoeff-potOdds)<=0.04){
               const callPct = Math.round(Math.max(30,Math.min(85, (eq*eqCoeff-potOdds+0.04)/0.08*70+15)));
               mixFreq = {fold:100-callPct, call:callPct, raise:0};
-              rec = `混合策略 Mixed: ${callPct}%跟注Call / ${100-callPct}%弃牌Fold`; verdict = 'warn';
-              why = `精准胜率 ${eqP}% ≈ 底池赔率 ${poP}%，处于GTO无差异区间。均衡策略要求按频率混合。`;
+              rec = `边缘牌: ${callPct}%跟注 / ${100-callPct}%弃牌`; verdict = 'warn';
+              why = `胜率 ${eqP}% 和需要的 ${poP}% 非常接近，跟注和弃牌差不多。GTO建议按频率混合决策。`;
             } else {
-              rec='跟注 Call'; verdict='ok';
-              why=`精准胜率 ${eqP}% ≥ 底池赔率 ${poP}%。跟注长期盈利(+EV)。${_pairedBoardWarn}${rioInfo.warn?'⚠️ '+rioInfo.note:''}`;
+              rec='跟注'; verdict='ok';
+              why=`胜率 ${eqP}% 高于需要的 ${poP}%（底池赔率）。跟注是赚钱的。${_pairedBoardWarn}${rioInfo.warn?'⚠️ '+rioInfo.note:''}`;
             }
           } else if(potOdds<0.18 && draw && (draw.flush||draw.oesd)){
-            rec='跟注听牌 Call (Draw Odds)'; verdict='warn';
-            why=`强听牌——${draw.flush?'同花听牌':'两头顺听牌'}，<b>${draw.outs}</b> 张补牌。底池赔率便宜(${poP}%)，隐含赔率使跟注有利。`;
+            rec='跟注听牌'; verdict='warn';
+            why=`你有${draw.flush?'同花':'两头顺'}听牌，<b>${draw.outs}</b> 张补牌。跟注价格便宜(${poP}%)，中牌后回报很大。`;
           } else {
-            rec='弃牌 Fold'; verdict='bad';
-            why=`精准胜率 ${eqP}% < 底池赔率 ${poP}%。跟注长期亏损(-EV)，弃牌止损。`;
+            rec='弃牌'; verdict='bad';
+            why=`胜率 ${eqP}% 低于需要的 ${poP}%。跟注会亏钱，弃牌止损。`;
           }
         }
       }
@@ -1807,9 +1806,12 @@ function showCoach(){
       const _pCtx = toCall > 0 ? 'vsBet' : 'first';
       const _pio = pioLookup(G.street, tex.type, _hc, _pCtx);
       if(_pio){
-        const catLabels = {nuts:'坚果(Nuts)',topPair:'顶对+(Top Pair+)',midPair:'中对(Mid Pair)',weakPair:'弱对(Weak Pair)',strongDraw:'强听牌(Strong Draw)',weakDraw:'弱听牌(Weak Draw)',air:'空气(Air)'};
+        const catLabels = {nuts:'超强牌',topPair:'顶对/强牌',midPair:'中等对子',weakPair:'弱对子',strongDraw:'强听牌',weakDraw:'弱听牌/高牌',air:'未中牌'};
+        const actLabels = {bet:'下注',check:'过牌',call:'跟注',fold:'弃牌',raise:'加注',mixed:'混合'};
         const catLabel = catLabels[_hc] || _hc;
-        pioExtra += '<div style="margin-top:5px;padding:4px 8px;background:rgba(76,175,80,.10);border-left:3px solid #4caf50;border-radius:4px;font-size:10px;color:#81c784"><b>📊 PioSOLVER决策:</b> '+catLabel+' @ '+tex.note+' → Pio推荐: <b>'+_pio.a+'</b>'+(_pio.s?' '+(_pio.s*100|0)+'%pot':'')+(_pio.rs?' '+_pio.rs+'x':'')+' ('+((_pio.f*100)|0)+'%频率)</div>';
+        const actLabel = actLabels[_pio.a] || _pio.a;
+        let sizeInfo = _pio.s ? ' '+(_pio.s*100|0)+'%底池' : _pio.rs ? ' '+_pio.rs+'倍' : '';
+        pioExtra += '<div style="margin-top:5px;padding:4px 8px;background:rgba(76,175,80,.10);border-left:3px solid #4caf50;border-radius:4px;font-size:10px;color:#81c784"><b>📊 GTO参考:</b> 你的'+catLabel+'在这个牌面 → 建议<b>'+actLabel+sizeInfo+'</b>（'+((_pio.f*100)|0)+'%的情况这样打）</div>';
       }
     }
     // 1. Exploit adjustment based on villain style
@@ -1817,7 +1819,7 @@ function showCoach(){
     const villainStyle = villain.length===1 && villain[0].arch ? Object.keys(STYLES).find(k=>STYLES[k]===villain[0].arch) : null;
     const exploitInfo = exploitAdjustment(p.hole, G.board, villainStyle, G.street, eq, potOdds);
     if(exploitInfo.adj && exploitInfo.adj!=='标准GTO'){
-      pioExtra += `<div style="margin-top:5px;padding:4px 8px;background:rgba(232,185,74,.08);border-left:3px solid var(--gold);border-radius:4px;font-size:10px;color:var(--gold)"><b>⚡ 利用性 Exploit vs ${villainStyle}:</b> ${exploitInfo.adj} — ${exploitInfo.note}</div>`;
+      pioExtra += `<div style="margin-top:5px;padding:4px 8px;background:rgba(232,185,74,.08);border-left:3px solid var(--gold);border-radius:4px;font-size:10px;color:var(--gold)"><b>⚡ 针对${villainStyle}对手:</b> ${exploitInfo.adj} — ${exploitInfo.note}</div>`;
     }
     // 2. Multi-street plan
     if(G.street!=='preflop' && G.street!=='showdown'){
@@ -1828,35 +1830,35 @@ function showCoach(){
     if(G.street!=='preflop' && tex.type!=='preflop'){
       const score7 = evaluate7(p.hole.concat(G.board));
       const pioSz = pioSizing(G.street, tex.type, score7[0], spr.spr);
-      pioExtra += `<div style="margin-top:3px;font-size:9px;color:var(--text3)">📊 Pio参考尺度: ${pioSz.label}</div>`;
+      pioExtra += '<div style="margin-top:3px;font-size:9px;color:var(--text3)">💰 建议下注尺度: '+pioSz.label+'</div>';
     }
     // 4. Vs-bet reference frequencies
     if(toCall>0 && G.street!=='preflop' && PIO_STRATEGY.vsBet[G.street] && PIO_STRATEGY.vsBet[G.street][tex.type]){
       const vsb = PIO_STRATEGY.vsBet[G.street][tex.type];
-      pioExtra += `<div style="margin-top:3px;font-size:9px;color:var(--text3)">📊 Pio面对下注参考: ${vsb.call}%跟注 / ${vsb.raise}%加注 / ${vsb.fold}%弃牌 (加注${vsb.rSz}x)</div>`;
+      pioExtra += '<div style="margin-top:3px;font-size:9px;color:var(--text3)">📊 类似局面GTO: '+vsb.call+'%跟注 / '+vsb.raise+'%加注 / '+vsb.fold+'%弃牌</div>';
     }
 
     co.classList.add('show');
     const eqLine = (toCall>0&&eqRange!=null)
-      ? `<span style="color:var(--text2)">精准胜率(Precise Equity) <b>vs ${actionLine}</b> 范围: <span class="num">${eqP}%</span> · 底池赔率(Pot Odds) <span class="num">${poP}%</span>${G.street==='preflop'&&toCall>0?` · <span style="color:var(--warn)">实现率(EQ Realization) <b>${(eqR*100)|0}%</b></span>`:''}</span>`
-      : `<span style="color:var(--text2)">胜率(Equity) <span class="num">${eqP}%</span>${toCall>0?' · 底池赔率(Pot Odds) <span class="num">'+poP+'%</span>':''}</span>`;
+      ? `<span style="color:var(--text2)">胜率(vs对手范围): <span class="num">${eqP}%</span> · 底池赔率: <span class="num">${poP}%</span>${G.street==='preflop'&&toCall>0?` · <span style="color:var(--warn)">实现率 <b>${(eqR*100)|0}%</b></span>`:''}</span>`
+      : `<span style="color:var(--text2)">胜率: <span class="num">${eqP}%</span>${toCall>0?' · 底池赔率: <span class="num">'+poP+'%</span>':''}</span>`;
 
     let items;
     if(G.street==='preflop' && G.currentBet<=BB_AMT && posLabel(p.id)!=='BB'){
-      items=[{label:'弃牌 Fold',val:0,rec:rec.includes('弃牌')}];
-      if(evOpen!=null) items.push({label:`开池 Open ${openToPf}`,val:evOpen,rec:rec.includes('加注')||rec.includes('开池')});
+      items=[{label:'弃牌',val:0,rec:rec.includes('弃牌')}];
+      if(evOpen!=null) items.push({label:`开池 ${openToPf}`,val:evOpen,rec:rec.includes('加注')||rec.includes('开池')});
     } else if(toCall>0){
-      items=[{label:'弃牌 Fold',val:0,rec:rec.includes('弃牌')&&!rec.includes('混合')}];
-      items.push({label:'跟注 Call',val:evCall||0,rec:rec.includes('跟注')||rec.includes('混合')});
-      if(evRaise!=null) items.push({label:`加注 Raise ${RStd}`,val:evRaise,rec:rec.includes('加注')||rec.includes('3bet')});
+      items=[{label:'弃牌',val:0,rec:rec.includes('弃牌')&&!rec.includes('边缘')}];
+      items.push({label:'跟注',val:evCall||0,rec:rec.includes('跟注')||rec.includes('边缘')});
+      if(evRaise!=null) items.push({label:`加注 ${RStd}`,val:evRaise,rec:rec.includes('加注')||rec.includes('3bet')});
     } else {
-      items=[{label:'过牌 Check',val:0,rec:rec.includes('过牌')}];
-      items.push({label:`下注 Bet ${bStd}`,val:evBet,rec:rec.includes('下注')||rec.includes('Cbet')||rec.includes('半诈唬')});
+      items=[{label:'过牌',val:0,rec:rec.includes('过牌')}];
+      items.push({label:`下注 ${bStd}`,val:evBet,rec:rec.includes('下注')||rec.includes('Cbet')||rec.includes('半诈唬')});
     }
 
     let freqHtml = '';
     if(mixFreq && freqMode){
-      freqHtml = `<div style="margin-top:8px;font-size:11px;color:var(--gold);font-weight:700">🎲 GTO混合频率(Mixed Strategy)</div>`;
+      freqHtml = `<div style="margin-top:8px;font-size:11px;color:var(--gold);font-weight:700">🎲 GTO混合频率</div>`;
       freqHtml += `<div class="strategy-bar" style="margin-top:4px">`;
       if(mixFreq.fold>0) freqHtml += `<div class="strat-fold" style="width:${mixFreq.fold}%">${mixFreq.fold>10?mixFreq.fold+'%':''}</div>`;
       if(mixFreq.call>0) freqHtml += `<div class="strat-call" style="width:${mixFreq.call}%">${mixFreq.call>10?mixFreq.call+'%':''}</div>`;
@@ -1877,7 +1879,7 @@ function showCoach(){
     co.innerHTML=`
       <div class="coach-main">
         <span class="lead">👨‍🏫 ${rec}</span>
-        <span class="verdict ${verdict}">${verdict==='ok'?'✓ 明确 Clear':verdict==='warn'?'⚠ 边缘/混合 Marginal':'✗ 亏损 -EV'}</span>
+        <span class="verdict ${verdict}">${verdict==='ok'?'✓ 明确':verdict==='warn'?'⚠ 边缘':'✗ 亏损'}</span>
       </div>
       <div class="coach-brief">${why}</div>
       ${freqHtml}
@@ -1885,16 +1887,16 @@ function showCoach(){
       ${villainRangeHTML}
       <div style="margin-top:6px">${evBars(items)}</div>
       <details class="coach-details">
-        <summary>查看详细依据 View Details</summary>
+        <summary>查看详细依据</summary>
         <div style="margin-top:6px">${eqLine}</div>
         <div style="font-size:10px;color:var(--text2);margin-top:6px;line-height:1.7">
-          <b>📊 局面概况 Situation:</b><br>
-          底池(Pot) <span class="num">${pot}</span> · 需跟注(To Call) <span class="num">${toCall}</span> · 对手(Opponents) <span class="num">${opp}</span>家 · SPR(筹码底池比) <span class="num">${spr.spr}</span> — <b>${spr.cat==='ultra_low'?'极低(打光)':spr.cat==='low'?'低(可三街打光)':spr.cat==='medium'?'中等(控池)':'深(小注控池)'}</b>
-          ${btInfo.length?'<br><b>🛡️ 阻断牌(Blockers):</b> '+btInfo.join('；'):''}
-          ${rioInfo.warn?'<br><span style="color:var(--warn)">⚠️ <b>反向隐含赔率(Reverse Implied Odds):</b> '+rioInfo.note+'</span>':''}
-          <br><b>📈 估算数据 Estimates:</b><br>
-          街层弃牌率(Fold Equity) <span class="num">${(fe*100|0)}%</span> · 行动线(Action Line) <b>${actionLine}</b>
-          ${G.street!=='preflop' ? '<br><b>📐 GTO概念(GTO Concepts):</b><br>'+gtoConceptExplainer(G.street, tex, eq, potOdds, actionLine) : ''}
+          <b>📊 局面概况:</b><br>
+          底池 <span class="num">${pot}</span> · 需跟注 <span class="num">${toCall}</span> · 对手 <span class="num">${opp}</span>家 · 筹码底池比 <span class="num">${spr.spr}</span> — <b>${spr.cat==='ultra_low'?'极低(打光)':spr.cat==='low'?'低(可三街打光)':spr.cat==='medium'?'中等(控池)':'深(小注控池)'}</b>
+          ${btInfo.length?'<br><b>🛡️ 阻断牌:</b> '+btInfo.join('；'):''}
+          ${rioInfo.warn?'<br><span style="color:var(--warn)">⚠️ <b>反向隐含赔率:</b> '+rioInfo.note+'</span>':''}
+          <br><b>📈 估算:</b><br>
+          弃牌率 <span class="num">${(fe*100|0)}%</span> · 行动线 <b>${actionLine}</b>
+          ${G.street!=='preflop' ? '<br><b>📐 GTO概念:</b><br>'+gtoConceptExplainer(G.street, tex, eq, potOdds, actionLine) : ''}
         </div>
       </details>`;
     // Trigger background CFR for turn/river

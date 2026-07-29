@@ -672,6 +672,155 @@ function oppInRange(oh,board,tier){if(board.length===0){const c=chen(oh);if(tier
 function riverCFR(heroHole, board, pot, bet, iters=1200){const heroR=solverEnumRange(board,'arrive',board.concat(heroHole));heroR.unshift(heroHole);const villR=solverEnumRange(board,'arrive',board.concat(heroHole));if(villR.length<4||heroR.length<4) return null;const W=heroR.map(h=>villR.map(v=>{const hk=new Set(h.map(keyOf));if(v.some(c=>hk.has(keyOf(c)))) return -1;const c=cmp(evaluate7(h.concat(board)),evaluate7(v.concat(board)));return c>0?1:c===0?0.5:0;}));const H=heroR.length, V=villR.length;const hReg=Array.from({length:H},()=>[0,0]);const vReg=Array.from({length:V},()=>[0,0]);const hStratSum=Array.from({length:H},()=>[0,0]);const vStratSum=Array.from({length:V},()=>[0,0]);function regretMatch(regrets){const pos = regrets.map(r=>Math.max(0,r));const sum = pos[0]+pos[1];if(sum<=0) return [0.5,0.5];return [pos[0]/sum, pos[1]/sum];}for(let t=1; t<=iters; t++){const weight = Math.sqrt(t);const hStrat = hReg.map(regretMatch);for(let h=0; h<H; h++){let evCheck=0, evBet=0, count=0;for(let v=0; v<V; v++){const eq = W[h][v];if(eq<0) continue;count++;const vStrat = regretMatch(vReg[v]);evCheck += eq * pot;evBet += vStrat[0]*pot + vStrat[1]*(eq*(pot+2*bet)-bet);}if(!count) continue;evCheck /= count;evBet /= count;const avgEV = hStrat[h][0]*evCheck + hStrat[h][1]*evBet;hReg[h][0] = Math.max(0, hReg[h][0] + evCheck - avgEV);hReg[h][1] = Math.max(0, hReg[h][1] + evBet - avgEV);hStratSum[h][0] += weight * hStrat[h][0];hStratSum[h][1] += weight * hStrat[h][1];}const vStrat = vReg.map(regretMatch);for(let v=0; v<V; v++){let evFold=0, evCall=0, count=0;for(let h=0; h<H; h++){const eq = W[h][v];if(eq<0) continue;const hBetProb = regretMatch(hReg[h])[1];if(hBetProb <= 1e-9) continue;count += hBetProb;evCall += hBetProb * ((1-eq)*(pot+2*bet)-bet);}if(count <= 1e-9){vStratSum[v][0] += weight*0.5;vStratSum[v][1] += weight*0.5;continue;}evCall /= count;evFold = 0;const avgEV = vStrat[v][0]*evFold + vStrat[v][1]*evCall;vReg[v][0] = Math.max(0, vReg[v][0] + evFold - avgEV);vReg[v][1] = Math.max(0, vReg[v][1] + evCall - avgEV);vStratSum[v][0] += weight * vStrat[v][0];vStratSum[v][1] += weight * vStrat[v][1];}}function avgStrat(stratSum){return stratSum.map(s=>{const total=s[0]+s[1];return total>0 ? [s[0]/total, s[1]/total] : [0.5,0.5];});}const HS = avgStrat(hStratSum);const VS = avgStrat(vStratSum);const heroSelf = HS[0];let evCheck=0, evBet=0, n0=0;for(let v=0; v<V; v++){const eq = W[0][v];if(eq<0) continue;n0++;evCheck += eq * pot;evBet += VS[v][0]*pot + VS[v][1]*(eq*(pot+2*bet)-bet);}if(n0){ evCheck/=n0; evBet/=n0; }let betFreq=0, valBet=0, bluffBet=0;for(let h=0; h<H; h++){betFreq += HS[h][1];let avgEq=0, cnt=0;for(let v=0; v<V; v++){ if(W[h][v]>=0){avgEq+=W[h][v];cnt++;} }if(cnt>0 && avgEq/cnt >= 0.5) valBet += HS[h][1];else bluffBet += HS[h][1];}betFreq /= H;const villCallFreq = VS.reduce((a,s)=>a+s[1],0) / V;const mdf = pot/(pot+bet);return {self: heroSelf, evCheck, evBet, betFreq,bluffRatio: (valBet+bluffBet)>0 ? bluffBet/(valBet+bluffBet) : 0,valBetRatio: (valBet+bluffBet)>0 ? valBet/(valBet+bluffBet) : 0,villCall: villCallFreq, mdf, nH: H, nV: V, iters,convergence: Math.abs(evCheck - evBet) < pot*0.02 ? 'tight' : 'wide'};}
 // riverCFR kept for internal use, solver button removed
 
+// === Background CFR Solver (async, updates coach when ready) ===
+let _cfrTimer = null;
+function backgroundCFR(heroHole, board, pot, toCall, street){
+  if(_cfrTimer) clearTimeout(_cfrTimer);
+  _cfrTimer = setTimeout(()=>{
+    try{
+      let result = null;
+      if(street==='river' && board.length===5){
+        const bet = Math.max(toCall, Math.round(pot*0.66));
+        result = riverCFR(heroHole, board, pot, bet, 1000);
+      } else if(street==='turn' && board.length===4){
+        result = turnCFR(heroHole, board, pot, toCall, 600);
+      }
+      if(result){
+        const co = document.getElementById('coach');
+        if(!co || !co.classList.contains('show')) return;
+        const cfrDiv = co.querySelector('.cfr-result');
+        if(cfrDiv) cfrDiv.remove();
+        const el = document.createElement('div');
+        el.className = 'cfr-result';
+        el.style.cssText = 'margin-top:5px;padding:5px 8px;background:rgba(33,150,243,.10);border-left:3px solid #2196f3;border-radius:4px;font-size:10px;color:#64b5f6';
+        let html = '<b>🧮 CFR实时求解:</b> ';
+        if(result.evBet !== undefined){
+          const betBetter = result.evBet > result.evCheck;
+          html += betBetter ? '下注EV更高' : '过牌EV更高';
+          html += ` (下注率${(result.betFreq*100)|0}%, 价值比${(result.valBetRatio*100)|0}%/诈唬${(result.bluffRatio*100)|0}%)`;
+        }
+        if(result.toCallAction){
+          html += ` 面对下注: ${result.toCallAction} (EV: ${result.toCallEV.toFixed(1)})`;
+        }
+        html += ` <span style="color:var(--text3)">[${result.nH||'?'}×${result.nV||'?'}范围, ${result.iters}迭代]</span>`;
+        el.innerHTML = html;
+        const details = co.querySelector('.coach-details');
+        if(details) details.parentNode.insertBefore(el, details);
+        else co.appendChild(el);
+      }
+    }catch(e){ console.log('backgroundCFR error:', e); }
+    _cfrTimer = null;
+  }, 200); // 200ms delay so UI renders first
+}
+
+function turnCFR(heroHole, board, pot, toCall, iters){
+  const heroR = solverEnumRange(board, 'arrive', board.concat(heroHole));
+  heroR.unshift(heroHole);
+  const villR = solverEnumRange(board, 'arrive', board.concat(heroHole));
+  if(villR.length<4 || heroR.length<4) return null;
+  const H = heroR.length, V = villR.length;
+  const bet = Math.max(toCall, Math.round(pot*0.66));
+  const deck = freshDeck();
+  const usedKeys = new Set([...board, ...heroHole].map(keyOf));
+  const riverCards = deck.filter(c=>!usedKeys.has(keyOf(c)));
+  // Pre-compute equity for hero[0] vs each villain hand on random rivers
+  const SAMPLE_RIVERS = Math.min(8, riverCards.length);
+  const sampledRivers = [];
+  for(let i=0; i<SAMPLE_RIVERS; i++){
+    sampledRivers.push(riverCards[Math.floor(Math.random()*riverCards.length)]);
+  }
+  // Win matrix: W[h][v][r] = hero equity (0/0.5/1) for hero hand h vs villain v on river r
+  const W = heroR.map(h=>villR.map(v=>{
+    const hk = new Set(h.map(keyOf));
+    if(v.some(c=>hk.has(keyOf(c)))) return null; // dead
+    return sampledRivers.map(rc=>{
+      if(hk.has(keyOf(rc)) || v.some(c=>keyOf(c)===keyOf(rc))) return 0.5;
+      const fullBoard = board.concat([rc]);
+      const c = cmp(evaluate7(h.concat(fullBoard)), evaluate7(v.concat(fullBoard)));
+      return c>0?1:c===0?0.5:0;
+    });
+  }));
+  // CFR: hero actions = [check, bet], villain responses = [check/fold, bet/call]
+  const hReg = Array.from({length:H},()=>[0,0]);
+  const vReg = Array.from({length:V},()=>[0,0]);
+  const hStratSum = Array.from({length:H},()=>[0,0]);
+  const vStratSum = Array.from({length:V},()=>[0,0]);
+  function regretMatch(regrets){
+    const pos=regrets.map(r=>Math.max(0,r));
+    const sum=pos[0]+pos[1];
+    if(sum<=0) return [0.5,0.5];
+    return [pos[0]/sum, pos[1]/sum];
+  }
+  for(let t=1;t<=iters;t++){
+    const weight=Math.sqrt(t);
+    const hStrat=hReg.map(regretMatch);
+    for(let h=0;h<H;h++){
+      let evCheck=0,evBet=0,count=0;
+      for(let v=0;v<V;v++){
+        const wins=W[h][v];
+        if(!wins) continue;
+        count++;
+        const avgEq=wins.reduce((a,b)=>a+b,0)/wins.length;
+        const vStrat=regretMatch(vReg[v]);
+        evCheck+=avgEq*pot;
+        evBet+=vStrat[0]*pot + vStrat[1]*(avgEq*(pot+2*bet)-bet);
+      }
+      if(!count) continue;
+      evCheck/=count; evBet/=count;
+      const avgEV=hStrat[h][0]*evCheck+hStrat[h][1]*evBet;
+      hReg[h][0]=Math.max(0,hReg[h][0]+evCheck-avgEV);
+      hReg[h][1]=Math.max(0,hReg[h][1]+evBet-avgEV);
+      hStratSum[h][0]+=weight*hStrat[h][0];
+      hStratSum[h][1]+=weight*hStrat[h][1];
+    }
+    const vStrat=vReg.map(regretMatch);
+    for(let v=0;v<V;v++){
+      let evFold=0,evCall=0,count=0;
+      for(let h=0;h<H;h++){
+        const wins=W[h][v];
+        if(!wins) continue;
+        const avgEq=wins.reduce((a,b)=>a+b,0)/wins.length;
+        const hBetProb=regretMatch(hReg[h])[1];
+        if(hBetProb<=1e-9) continue;
+        count+=hBetProb;
+        evCall+=hBetProb*((1-avgEq)*(pot+2*bet)-bet);
+      }
+      if(count<=1e-9){vStratSum[v][0]+=weight*0.5;vStratSum[v][1]+=weight*0.5;continue;}
+      evCall/=count; evFold=0;
+      const avgEV=vStrat[v][0]*evFold+vStrat[v][1]*evCall;
+      vReg[v][0]=Math.max(0,vReg[v][0]+evFold-avgEV);
+      vReg[v][1]=Math.max(0,vReg[v][1]+evCall-avgEV);
+      vStratSum[v][0]+=weight*vStrat[v][0];
+      vStratSum[v][1]+=weight*vStrat[v][1];
+    }
+  }
+  function avgStrat(ss){return ss.map(s=>{const t=s[0]+s[1];return t>0?[s[0]/t,s[1]/t]:[0.5,0.5];});}
+  const HS=avgStrat(hStratSum), VS=avgStrat(vStratSum);
+  const heroSelf=HS[0];
+  let evCheck=0,evBet=0,n0=0;
+  for(let v=0;v<V;v++){
+    const wins=W[0][v];
+    if(!wins) continue;
+    const avgEq=wins.reduce((a,b)=>a+b,0)/wins.length;
+    n0++;
+    evCheck+=avgEq*pot;
+    evBet+=VS[v][0]*pot+VS[v][1]*(avgEq*(pot+2*bet)-bet);
+  }
+  if(n0){evCheck/=n0;evBet/=n0;}
+  let betFreq=0,valBet=0,bluffBet=0;
+  for(let h=0;h<H;h++){
+    betFreq+=HS[h][1];
+    let avgEq=0,cnt=0;
+    for(let v=0;v<V;v++){const w=W[h][v];if(w){avgEq+=w.reduce((a,b)=>a+b,0)/w.length;cnt++;}}
+    if(cnt>0&&avgEq/cnt>=0.5) valBet+=HS[h][1]; else bluffBet+=HS[h][1];
+  }
+  betFreq/=H;
+  return {self:heroSelf, evCheck, evBet, betFreq,
+    bluffRatio:(valBet+bluffBet)>0?bluffBet/(valBet+bluffBet):0,
+    valBetRatio:(valBet+bluffBet)>0?valBet/(valBet+bluffBet):0,
+    nH:H, nV:V, iters, street:'turn'};
+}
+
 /* ============================ 精确范围构建引擎 ============================ */
 function expandRange(str) {
   const set = new Set();
@@ -1748,6 +1897,10 @@ function showCoach(){
           ${G.street!=='preflop' ? '<br><b>📐 GTO概念(GTO Concepts):</b><br>'+gtoConceptExplainer(G.street, tex, eq, potOdds, actionLine) : ''}
         </div>
       </details>`;
+    // Trigger background CFR for turn/river
+    if(G.street==='turn'||G.street==='river'){
+      backgroundCFR(p.hole, G.board, pot, toCall, G.street);
+    }
   }catch(e){
     console.error('showCoach error:',e);
     co.innerHTML=`<span style="color:var(--bad)">教练加载失败：${e.message||'未知错误'}</span>`;

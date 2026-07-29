@@ -1080,6 +1080,127 @@ function multiStreetPlan(hole, board, street, eq, spr){
   }
   return plan;
 }
+// === Hand Category Classification for Pio Lookup ===
+function classifyHand(hole, board){
+  if(board.length<3) return 'preflop';
+  const score = evaluate7(hole.concat(board));
+  const cat = score[0]; // 0=highcard,1=pair,2=twopair,3=trips,4=straight,5=flush,6=fullhouse,7=quads,8=straightflush
+  const ranks = board.map(c=>c.rank);
+  const maxR = Math.max(...ranks);
+  const holeRanks = hole.map(c=>c.rank);
+  const topKicker = Math.max(...holeRanks);
+  // Draws (only on flop/turn)
+  const suits = board.map(c=>c.suit);
+  const sc = [0,0,0,0]; suits.forEach(s=>sc[s]++);
+  const holeSuits = hole.map(c=>c.suit);
+  const flushDraw = sc.some((cnt,i)=>cnt===2&&holeSuits.includes(i)&&sc[i]+holeSuits.filter(s=>s===i).length>=4);
+  // Straight draw check
+  const allR = [...new Set([...ranks,...holeRanks])];
+  const hasOESD = (function(){
+    if(board.length>=5) return false;
+    const rset = new Set(ranks);
+    let maxC=0,c=0;
+    for(let i=2;i<=14;i++){if(rset.has(i)){c++;maxC=Math.max(maxC,c);}else c=0;}
+    return maxC>=3 && holeRanks.some(r=>{const ns=new Set([...ranks,r]);if(r===14)ns.add(1);let mc2=0,c2=0;for(let i=2;i<=14;i++){if(ns.has(i)){c2++;mc2=Math.max(mc2,c2);}else c2=0;}return mc2>=5;});
+  })();
+  // Classification
+  if(cat>=4) return 'nuts'; // straight+
+  if(cat===3) return board.length>=4 && ranks.some(r=>r===score[1])?'nuts':'topPair'; // trips: nut if board pairs the trips rank
+  if(cat===2){
+    if(board.some(r=>r===score[1])&&board.filter(c=>c===score[1]).length>=2) return 'midPair'; // two pair using board pair
+    return 'topPair';
+  }
+  if(cat===1){
+    if(score[1]===maxR && topKicker>=maxR) return 'topPair';
+    if(score[1]===maxR) return 'topPair';
+    if(score[1]>=maxR-1 && maxR<=12) return 'midPair';
+    if(score[1]>=9) return 'midPair';
+    return 'weakPair';
+  }
+  if(flushDraw || hasOESD) return 'strongDraw';
+  if(cat===0 && topKicker>=13 && board.length<5) return 'weakDraw'; // overcards
+  return 'air';
+}
+// === PioSOLVER Hand-Category Strategy Tables ===
+// context: 'first' (first to act), 'vsBet' (facing bet), 'vsRaise' (facing raise)
+// action: 'bet','check','call','fold','raise','mixed'
+const PIO_HAND_STRATEGY = {
+  flop: {
+    first: {
+      dry_high:    {nuts:{a:'bet',s:.33,f:1},topPair:{a:'bet',s:.33,f:.85},midPair:{a:'check',bf:.35,s:.33},weakPair:{a:'check',bf:.15,s:.33},strongDraw:{a:'bet',s:.50,f:.50},weakDraw:{a:'check',bf:.25,s:.33},air:{a:'check',bf:.30,s:.33}},
+      dry_low:     {nuts:{a:'bet',s:.33,f:1},topPair:{a:'bet',s:.33,f:.75},midPair:{a:'check',bf:.25,s:.33},weakPair:{a:'check',bf:.10,s:.33},strongDraw:{a:'bet',s:.50,f:.45},weakDraw:{a:'check',bf:.20},air:{a:'check',bf:.20,s:.33}},
+      wet:         {nuts:{a:'bet',s:.66,f:1},topPair:{a:'bet',s:.55,f:.65},midPair:{a:'check',bf:.20,s:.50},weakPair:{a:'check',bf:.10},strongDraw:{a:'bet',s:.66,f:.55},weakDraw:{a:'check',bf:.15},air:{a:'check',bf:.15,s:.66}},
+      mono:        {nuts:{a:'bet',s:.25,f:1},topPair:{a:'check',bf:.25,s:.25},midPair:{a:'check',bf:.10},weakPair:{a:'check',bf:.05},strongDraw:{a:'bet',s:.33,f:.40},weakDraw:{a:'check'},air:{a:'check',bf:.10,s:.25}},
+      paired_dry:  {nuts:{a:'bet',s:.33,f:1},topPair:{a:'bet',s:.33,f:.80},midPair:{a:'check',bf:.30,s:.33},weakPair:{a:'check',bf:.15,s:.33},strongDraw:{a:'bet',s:.50,f:.45},weakDraw:{a:'check',bf:.20},air:{a:'check',bf:.25,s:.33}},
+      paired_wet:  {nuts:{a:'bet',s:.50,f:1},topPair:{a:'bet',s:.50,f:.60},midPair:{a:'check',bf:.25,s:.50},weakPair:{a:'check',bf:.10},strongDraw:{a:'bet',s:.50,f:.50},weakDraw:{a:'check',bf:.15},air:{a:'check',bf:.15,s:.50}},
+      high_connected:{nuts:{a:'bet',s:.50,f:1},topPair:{a:'bet',s:.50,f:.70},midPair:{a:'check',bf:.30,s:.50},weakPair:{a:'check',bf:.15},strongDraw:{a:'bet',s:.50,f:.55},weakDraw:{a:'check',bf:.20},air:{a:'check',bf:.20,s:.50}},
+      brick:       {nuts:{a:'bet',s:.33,f:1},topPair:{a:'bet',s:.33,f:.80},midPair:{a:'check',bf:.30,s:.33},weakPair:{a:'check',bf:.15,s:.33},strongDraw:{a:'bet',s:.50,f:.45},weakDraw:{a:'check',bf:.20},air:{a:'check',bf:.20,s:.33}}
+    },
+    vsBet: {
+      dry_high:    {nuts:{a:'raise',rs:3.0,f:.80},topPair:{a:'call',f:.85},midPair:{a:'mixed',cf:.55,ff:.45},weakPair:{a:'fold',f:.65},strongDraw:{a:'mixed',cf:.60,rf:.25,rs:2.8},weakDraw:{a:'fold',f:.70},air:{a:'fold',f:.85}},
+      dry_low:     {nuts:{a:'raise',rs:3.0,f:.80},topPair:{a:'call',f:.80},midPair:{a:'mixed',cf:.50,ff:.50},weakPair:{a:'fold',f:.70},strongDraw:{a:'mixed',cf:.55,rf:.20,rs:2.8},weakDraw:{a:'fold',f:.75},air:{a:'fold',f:.85}},
+      wet:         {nuts:{a:'raise',rs:2.8,f:.75},topPair:{a:'mixed',cf:.65,rf:.15,rs:2.8},midPair:{a:'mixed',cf:.40,ff:.60},weakPair:{a:'fold',f:.75},strongDraw:{a:'mixed',cf:.50,rf:.25,rs:2.8},weakDraw:{a:'fold',f:.75},air:{a:'fold',f:.90}},
+      mono:        {nuts:{a:'raise',rs:2.5,f:.70},topPair:{a:'mixed',cf:.50,ff:.50},midPair:{a:'fold',f:.65},weakPair:{a:'fold',f:.85},strongDraw:{a:'mixed',cf:.55,rf:.15,rs:2.5},weakDraw:{a:'fold',f:.80},air:{a:'fold',f:.92}},
+      paired_dry:  {nuts:{a:'raise',rs:3.0,f:.80},topPair:{a:'call',f:.80},midPair:{a:'mixed',cf:.50,ff:.50},weakPair:{a:'fold',f:.65},strongDraw:{a:'mixed',cf:.55,rf:.20,rs:2.8},weakDraw:{a:'fold',f:.70},air:{a:'fold',f:.85}},
+      paired_wet:  {nuts:{a:'raise',rs:2.8,f:.75},topPair:{a:'mixed',cf:.60,rf:.15,rs:2.8},midPair:{a:'mixed',cf:.40,ff:.60},weakPair:{a:'fold',f:.75},strongDraw:{a:'mixed',cf:.50,rf:.20,rs:2.5},weakDraw:{a:'fold',f:.75},air:{a:'fold',f:.88}},
+      high_connected:{nuts:{a:'raise',rs:2.8,f:.75},topPair:{a:'mixed',cf:.60,rf:.20,rs:2.8},midPair:{a:'mixed',cf:.45,ff:.55},weakPair:{a:'fold',f:.70},strongDraw:{a:'mixed',cf:.55,rf:.25,rs:2.8},weakDraw:{a:'fold',f:.70},air:{a:'fold',f:.85}},
+      brick:       {nuts:{a:'raise',rs:3.0,f:.80},topPair:{a:'call',f:.80},midPair:{a:'mixed',cf:.50,ff:.50},weakPair:{a:'fold',f:.65},strongDraw:{a:'mixed',cf:.55,rf:.20,rs:2.8},weakDraw:{a:'fold',f:.70},air:{a:'fold',f:.85}}
+    }
+  },
+  turn: {
+    first: {
+      dry_high:    {nuts:{a:'bet',s:.66,f:1},topPair:{a:'bet',s:.55,f:.70},midPair:{a:'check',bf:.25,s:.50},weakPair:{a:'check'},strongDraw:{a:'bet',s:.66,f:.55},weakDraw:{a:'check',bf:.15},air:{a:'check',bf:.20,s:.66}},
+      dry_low:     {nuts:{a:'bet',s:.55,f:1},topPair:{a:'bet',s:.55,f:.65},midPair:{a:'check',bf:.20,s:.50},weakPair:{a:'check'},strongDraw:{a:'bet',s:.55,f:.50},weakDraw:{a:'check',bf:.10},air:{a:'check',bf:.15}},
+      wet:         {nuts:{a:'bet',s:.75,f:1},topPair:{a:'bet',s:.66,f:.55},midPair:{a:'check',bf:.15},weakPair:{a:'check'},strongDraw:{a:'bet',s:.66,f:.55},weakDraw:{a:'check',bf:.10},air:{a:'check',bf:.15}},
+      mono:        {nuts:{a:'bet',s:.50,f:1},topPair:{a:'check',bf:.30,s:.33},midPair:{a:'check'},weakPair:{a:'check'},strongDraw:{a:'bet',s:.50,f:.40},weakDraw:{a:'check'},air:{a:'check',bf:.10}},
+      paired_dry:  {nuts:{a:'bet',s:.66,f:1},topPair:{a:'bet',s:.55,f:.65},midPair:{a:'check',bf:.25,s:.50},weakPair:{a:'check'},strongDraw:{a:'bet',s:.55,f:.50},weakDraw:{a:'check',bf:.10},air:{a:'check',bf:.15}},
+      paired_wet:  {nuts:{a:'bet',s:.66,f:1},topPair:{a:'bet',s:.55,f:.50},midPair:{a:'check',bf:.20},weakPair:{a:'check'},strongDraw:{a:'bet',s:.55,f:.50},weakDraw:{a:'check',bf:.10},air:{a:'check',bf:.10}},
+      high_connected:{nuts:{a:'bet',s:.66,f:1},topPair:{a:'bet',s:.55,f:.60},midPair:{a:'check',bf:.25,s:.55},weakPair:{a:'check'},strongDraw:{a:'bet',s:.66,f:.55},weakDraw:{a:'check',bf:.10},air:{a:'check',bf:.15}},
+      brick:       {nuts:{a:'bet',s:.55,f:1},topPair:{a:'bet',s:.55,f:.65},midPair:{a:'check',bf:.25,s:.50},weakPair:{a:'check'},strongDraw:{a:'bet',s:.55,f:.50},weakDraw:{a:'check',bf:.10},air:{a:'check',bf:.15}}
+    },
+    vsBet: {
+      dry_high:    {nuts:{a:'raise',rs:2.8,f:.75},topPair:{a:'call',f:.75},midPair:{a:'mixed',cf:.45,ff:.55},weakPair:{a:'fold',f:.75},strongDraw:{a:'mixed',cf:.50,rf:.25,rs:2.5},weakDraw:{a:'fold',f:.80},air:{a:'fold',f:.90}},
+      dry_low:     {nuts:{a:'raise',rs:2.8,f:.75},topPair:{a:'call',f:.70},midPair:{a:'mixed',cf:.40,ff:.60},weakPair:{a:'fold',f:.80},strongDraw:{a:'mixed',cf:.45,rf:.20,rs:2.5},weakDraw:{a:'fold',f:.80},air:{a:'fold',f:.90}},
+      wet:         {nuts:{a:'raise',rs:2.5,f:.70},topPair:{a:'mixed',cf:.55,ff:.45},midPair:{a:'fold',f:.65},weakPair:{a:'fold',f:.85},strongDraw:{a:'mixed',cf:.45,rf:.25,rs:2.5},weakDraw:{a:'fold',f:.80},air:{a:'fold',f:.92}},
+      mono:        {nuts:{a:'raise',rs:2.5,f:.70},topPair:{a:'mixed',cf:.45,ff:.55},midPair:{a:'fold',f:.75},weakPair:{a:'fold',f:.88},strongDraw:{a:'mixed',cf:.50,rf:.15,rs:2.5},weakDraw:{a:'fold',f:.85},air:{a:'fold',f:.92}},
+      paired_dry:  {nuts:{a:'raise',rs:2.8,f:.75},topPair:{a:'call',f:.70},midPair:{a:'mixed',cf:.45,ff:.55},weakPair:{a:'fold',f:.75},strongDraw:{a:'mixed',cf:.45,rf:.20,rs:2.5},weakDraw:{a:'fold',f:.80},air:{a:'fold',f:.88}},
+      paired_wet:  {nuts:{a:'raise',rs:2.5,f:.70},topPair:{a:'mixed',cf:.50,rf:.15,rs:2.5},midPair:{a:'fold',f:.65},weakPair:{a:'fold',f:.80},strongDraw:{a:'mixed',cf:.45,rf:.20,rs:2.5},weakDraw:{a:'fold',f:.80},air:{a:'fold',f:.90}},
+      high_connected:{nuts:{a:'raise',rs:2.5,f:.70},topPair:{a:'mixed',cf:.55,rf:.15,rs:2.5},midPair:{a:'mixed',cf:.40,ff:.60},weakPair:{a:'fold',f:.78},strongDraw:{a:'mixed',cf:.50,rf:.25,rs:2.5},weakDraw:{a:'fold',f:.78},air:{a:'fold',f:.88}},
+      brick:       {nuts:{a:'raise',rs:2.8,f:.75},topPair:{a:'call',f:.70},midPair:{a:'mixed',cf:.45,ff:.55},weakPair:{a:'fold',f:.75},strongDraw:{a:'mixed',cf:.45,rf:.20,rs:2.5},weakDraw:{a:'fold',f:.80},air:{a:'fold',f:.88}}
+    }
+  },
+  river: {
+    first: {
+      dry_high:    {nuts:{a:'bet',s:1.0,f:1},topPair:{a:'bet',s:.66,f:.55},midPair:{a:'check'},weakPair:{a:'check'},strongDraw:{a:'bet',s:.75,f:.35},weakDraw:{a:'check'},air:{a:'check',bf:.20,s:.75}},
+      dry_low:     {nuts:{a:'bet',s:.75,f:1},topPair:{a:'bet',s:.55,f:.50},midPair:{a:'check'},weakPair:{a:'check'},strongDraw:{a:'bet',s:.66,f:.30},weakDraw:{a:'check'},air:{a:'check',bf:.15}},
+      wet:         {nuts:{a:'bet',s:1.0,f:1},topPair:{a:'bet',s:.66,f:.45},midPair:{a:'check'},weakPair:{a:'check'},strongDraw:{a:'bet',s:.75,f:.30},weakDraw:{a:'check'},air:{a:'check',bf:.15}},
+      mono:        {nuts:{a:'bet',s:.75,f:1},topPair:{a:'check',bf:.30,s:.50},midPair:{a:'check'},weakPair:{a:'check'},strongDraw:{a:'bet',s:.66,f:.30},weakDraw:{a:'check'},air:{a:'check',bf:.10}},
+      paired_dry:  {nuts:{a:'bet',s:.75,f:1},topPair:{a:'bet',s:.55,f:.50},midPair:{a:'check',bf:.25,s:.50},weakPair:{a:'check'},strongDraw:{a:'bet',s:.66,f:.30},weakDraw:{a:'check'},air:{a:'check',bf:.15}},
+      paired_wet:  {nuts:{a:'bet',s:.75,f:1},topPair:{a:'bet',s:.55,f:.40},midPair:{a:'check'},weakPair:{a:'check'},strongDraw:{a:'bet',s:.66,f:.25},weakDraw:{a:'check'},air:{a:'check',bf:.10}},
+      high_connected:{nuts:{a:'bet',s:1.0,f:1},topPair:{a:'bet',s:.66,f:.50},midPair:{a:'check'},weakPair:{a:'check'},strongDraw:{a:'bet',s:.75,f:.30},weakDraw:{a:'check'},air:{a:'check',bf:.15}},
+      brick:       {nuts:{a:'bet',s:.75,f:1},topPair:{a:'bet',s:.55,f:.50},midPair:{a:'check'},weakPair:{a:'check'},strongDraw:{a:'bet',s:.66,f:.25},weakDraw:{a:'check'},air:{a:'check',bf:.15}}
+    },
+    vsBet: {
+      dry_high:    {nuts:{a:'raise',rs:2.5,f:.70},topPair:{a:'mixed',cf:.60,ff:.40},midPair:{a:'mixed',cf:.35,ff:.65},weakPair:{a:'fold',f:.80},strongDraw:{a:'fold',f:.85},weakDraw:{a:'fold',f:.90},air:{a:'fold',f:.92}},
+      dry_low:     {nuts:{a:'raise',rs:2.5,f:.70},topPair:{a:'mixed',cf:.55,ff:.45},midPair:{a:'fold',f:.60},weakPair:{a:'fold',f:.82},strongDraw:{a:'fold',f:.85},weakDraw:{a:'fold',f:.90},air:{a:'fold',f:.92}},
+      wet:         {nuts:{a:'raise',rs:2.5,f:.70},topPair:{a:'mixed',cf:.50,ff:.50},midPair:{a:'fold',f:.65},weakPair:{a:'fold',f:.85},strongDraw:{a:'fold',f:.88},weakDraw:{a:'fold',f:.92},air:{a:'fold',f:.95}},
+      mono:        {nuts:{a:'raise',rs:2.5,f:.70},topPair:{a:'fold',f:.55},midPair:{a:'fold',f:.75},weakPair:{a:'fold',f:.88},strongDraw:{a:'fold',f:.90},weakDraw:{a:'fold',f:.92},air:{a:'fold',f:.95}},
+      paired_dry:  {nuts:{a:'raise',rs:2.5,f:.70},topPair:{a:'mixed',cf:.55,ff:.45},midPair:{a:'mixed',cf:.35,ff:.65},weakPair:{a:'fold',f:.80},strongDraw:{a:'fold',f:.85},weakDraw:{a:'fold',f:.90},air:{a:'fold',f:.92}},
+      paired_wet:  {nuts:{a:'raise',rs:2.5,f:.70},topPair:{a:'mixed',cf:.50,ff:.50},midPair:{a:'fold',f:.65},weakPair:{a:'fold',f:.82},strongDraw:{a:'fold',f:.88},weakDraw:{a:'fold',f:.92},air:{a:'fold',f:.95}},
+      high_connected:{nuts:{a:'raise',rs:2.5,f:.70},topPair:{a:'mixed',cf:.55,ff:.45},midPair:{a:'fold',f:.60},weakPair:{a:'fold',f:.80},strongDraw:{a:'fold',f:.85},weakDraw:{a:'fold',f:.90},air:{a:'fold',f:.92}},
+      brick:       {nuts:{a:'raise',rs:2.5,f:.70},topPair:{a:'mixed',cf:.55,ff:.45},midPair:{a:'mixed',cf:.35,ff:.65},weakPair:{a:'fold',f:.80},strongDraw:{a:'fold',f:.85},weakDraw:{a:'fold',f:.90},air:{a:'fold',f:.92}}
+    }
+  }
+};
+function pioLookup(street, texture, handCat, context){
+  const st = PIO_HAND_STRATEGY[street];
+  if(!st) return null;
+  const ctx = st[context];
+  if(!ctx) return null;
+  const texData = ctx[texture] || ctx['brick'];
+  if(!texData) return null;
+  return texData[handCat] || null;
+}
 function posLabel(id){const off=(id-button+N)%N;return POS_LABELS[N][off];}
 function evBars(items){const max=Math.max(...items.map(i=>Math.abs(i.val)),1);return '<div class="evrows">'+items.map(i=>{const w=Math.max(2,Math.round(Math.abs(i.val)/max*100));const pos=i.val>=0;return `<div class="evrow${i.rec?' rec':''}"><span class="evlab">${i.rec?'★ ':''}${i.label}</span><span class="evbar"><i style="width:${w}%;background:${i.val===0?'#4a5560':pos?'var(--good)':'var(--bad)'}"></i></span><span class="evval">${pos&&i.val!==0?'+':''}${Math.round(i.val)}</span></div>`;}).join('')+'</div>';}
 
@@ -1380,8 +1501,34 @@ function showCoach(){
         }
       }
     } else {
+      // === Post-flop: PioSOLVER-first decision tree ===
+      const handCat = classifyHand(p.hole, G.board);
+      const pioCtx = toCall > 0 ? 'vsBet' : 'first';
+      const pio = pioLookup(G.street, tex.type, handCat, pioCtx);
+      let pioUsed = false;
       if(toCall<=0){
-        // 【新增】超池下注建议：turn/river持有坚果优势时推荐1.5x底池
+        // First to act — Pio lookup primary
+        if(pio){
+          pioUsed = true;
+          const shouldBet = pio.a === 'bet' ? (Math.random() < pio.f) : pio.a === 'check' ? (pio.bf && Math.random() < pio.bf) : false;
+          if(shouldBet && (G.street==='turn'||G.street==='river') && handCat==='nuts' && opp<=2 && p.stack>pot*1.5){
+            const overbetAmt = Math.min(p.stack, Math.round(pot*1.5/5)*5);
+            recAmt=overbetAmt; rec=`超池下注 Overbet ${overbetAmt} (1.5x Pot)`; verdict='ok';
+            why=`<b>坚果优势(Nut Advantage)！</b>PioSOLVER: 超池下注获取最大价值。手牌分类 <b>${handCat}</b>，${tex.note}。胜率 ${eqP}%，对手范围顶端远弱于你。`;
+          } else if(shouldBet){
+            const pioSize = pio.s || 0.50;
+            const pioAmt = Math.min(Math.max(BB_AMT, Math.round(pot*pioSize/5)*5), p.stack);
+            const szLbl = pioSize<=0.25?'¼ Pot':pioSize<=0.33?'⅓ Pot':pioSize<=0.50?'½ Pot':pioSize<=0.66?'⅔ Pot':pioSize<=0.75?'¾ Pot':'Pot';
+            recAmt=pioAmt; rec=`下注 Bet ${pioAmt} (${szLbl})`; verdict='ok';
+            why=`📊 PioSOLVER: ${tex.note}，手牌分类 <b>${handCat}</b> → 下注 ${(pioSize*100)|0}%pot (${(pio.f*100)|0}%频率)。${handCat==='nuts'||handCat==='topPair'?'价值下注(Value Bet)提取最大价值。':handCat==='strongDraw'?'半诈唬(Semi-Bluff)兼顾弃牌率和中牌价值。':'利用范围优势(Range Advantage)施压。'}`;
+          } else {
+            rec='过牌 Check'; verdict=handCat==='nuts'||handCat==='topPair'?'ok':'warn';
+            const checkFreq = pio.a==='bet' ? ((1-pio.f)*100)|0 : pio.a==='check' ? (pio.bf ? ((1-pio.bf)*100)|0 : 100) : 100;
+            why=`📊 PioSOLVER: ${tex.note}，手牌分类 <b>${handCat}</b> → 过牌(Pio约${checkFreq}%过牌)。${pio.a==='check'&&pio.bf?`混合策略中有时(${(pio.bf*100)|0}%)可下注作为bluff。`:'范围平衡(Balanced Range)，保留摊牌价值(Showdown Value)。'}`;
+            if(handCat==='nuts'||handCat==='topPair') why += ` 控池(Pot Control)让对手在后续街犯错。`;
+          }
+        } else {
+        // Fallback: Monte Carlo heuristics
         if((G.street==='turn'||G.street==='river') && eq>=0.72 && opp<=2 && p.stack>pot*1.5){
           const overbetAmt = Math.min(p.stack, Math.round(pot*1.5/5)*5);
           recAmt=overbetAmt; rec=`超池下注 Overbet ${overbetAmt} (1.5x Pot)`; verdict='ok';
@@ -1421,54 +1568,101 @@ function showCoach(){
             why=`胜率(Equity) <b>${eqP}%</b> < 公平份额(Fair Share) ${fsP}%。牌力不足以价值下注(Value Bet)，过牌(Check)等待后续街改善或寻找诈唬机会(Bluff Spot)。`;
           }
         }
+        } // end fallback
       } else {
-        const callTh = potOdds;
+        // Facing a bet post-flop
         const _isDonkSpot = facingDonkBet(p.id);
         const _crScore = evaluate7(p.hole.concat(G.board));
         const _crCat = _crScore[0];
-        // 【修复】配对面两对不算价值加注牌型 — PioSOLVER: paired board上两对≈抓诈牌
         const _boardPair = tex.pair;
         const _isTwoPairOnPairedBoard = _boardPair && _crCat===2;
-        const valueRaise = (_isTwoPairOnPairedBoard ? false : _crCat >= 2) || eq >= 0.72;
-        const _pairedBoardWarn = _isTwoPairOnPairedBoard ? '⚠️ 配对面两对(Two Pair on Paired Board)：加注只会被更好的牌(三条/葫芦)跟注，GTO建议跟注抓诈唬(Bluff Catch)。' : '';
-        // 【新增】Donk bet应对建议
+        const _pairedBoardWarn = _isTwoPairOnPairedBoard ? '⚠️ 配桌面两对(Two Pair on Paired Board)：加注只会被更好的牌(三条/葫芦)跟注，GTO建议跟注抓诈唬(Bluff Catch)。' : '';
+        // Donk bet overrides
         if(_isDonkSpot && eq >= 0.55 && eq >= fairShare+0.12){
           const donkRaise = Math.min(p.stack, G.currentBet + Math.max(G.minRaise, Math.round(pot*0.7/5)*5));
           recAmt=donkRaise; rec=`加注驴式下注 Raise Donk Bet 到 ${donkRaise}`; verdict='ok';
-          why=`<b>面对驴式下注(Donk Bet)！</b>非翻前加注者(Non-PFR)主动下注通常表示弱牌(Weak)或中等牌力(Medium)。GTO建议用强牌(${eqP}%胜率)加注惩罚(Punish)这种不平衡的策略，最大化价值。`;
+          why=`<b>面对驴式下注(Donk Bet)！</b>非翻前加注者主动下注通常表示弱牌。GTO建议用强牌(${eqP}%胜率)加注惩罚，最大化价值。`;
         } else if(_isDonkSpot && draw && (draw.flush||draw.oesd) && opp===1){
           const donkRaise = Math.min(p.stack, G.currentBet + Math.max(G.minRaise, Math.round(pot*0.6/5)*5));
           recAmt=donkRaise; rec=`半诈唬加注驴式 Semi-Bluff Raise Donk 到 ${donkRaise}`; verdict='ok';
-          why=`<b>面对驴式下注(Donk Bet)！</b>Donk bet通常代表弱牌(Weak Range)，用强听牌(Strong Draw)半诈唬加注(Semi-Bluff Raise)可以：①立即赢池(Win Pot Now) ②中牌后赢大底池。双向正期望(+EV)。`;
-        } else if(valueRaise && evRaise!=null && evRaise>evCall){
-          recAmt=RStd; rec=`价值加注 Value Raise 到 ${RStd}`; verdict='ok';
-          why=`胜率(Equity) <b>${eqP}%</b> 明显领先，加注(Raise)获取最大价值(Max Value)。加注EV(加注期望值) > 跟注EV，数学上最优选择是加注。`;
-        } else if(draw && (draw.flush||draw.oesd) && evRaise!=null && evRaise>(evCall||0)+3 && opp===1 && p.stack>toCall*3 && actionLine !== 'vs_reraise'){
-          recAmt=RStd; rec=`半诈唬加注 Semi-Bluff Raise 到 ${RStd}`; verdict='ok';
-          why=`强听牌(Strong Draw) + 加注EV显著高于跟注。半诈唬加注(Semi-Bluff Raise)增加弃牌率(Fold Equity)，同时保留中牌赢大底池的隐含赔率(Implied Odds)。`;
-        } else if(eq * eqCoeff >= callTh){
-          if(freqMode && Math.abs(eq*eqCoeff-callTh)<=0.04){
-            const callPct = Math.round(Math.max(30,Math.min(85, (eq*eqCoeff-callTh+0.04)/0.08*70+15)));
-            mixFreq = {fold:100-callPct, call:callPct, raise:0};
-            rec = `混合策略 Mixed: ${callPct}%跟注Call / ${100-callPct}%弃牌Fold`;
-            verdict = 'warn';
-            why = `精准胜率(Precise Equity) <b>${eqP}%</b> ≈ 底池赔率(Pot Odds) <b>${poP}%</b>，处于<b>GTO无差异区间(Indifference Zone)</b>。数学上跟注和弃牌EV几乎相同，均衡策略(Nash Equilibrium)要求按频率混合决策，避免被对手剥削。`;
-          } else {
-            rec='跟注 Call'; verdict='ok';
-            why=`精准胜率(Precise Equity) <b>${eqP}%</b> ≥ 所需底池赔率(Pot Odds) <b>${poP}%</b>。跟注(Call)长期盈利(+EV)。${_pairedBoardWarn}${rioInfo.warn?'⚠️ '+rioInfo.note:''}`;
+          why=`<b>面对驴式下注(Donk Bet)！</b>Donk bet通常代表弱牌，用强听牌半诈唬加注：①立即赢池 ②中牌赢大底池。双向正期望。`;
+        } else if(pio && !_isDonkSpot){
+          // === PioSOLVER-first: facing bet ===
+          pioUsed = true;
+          let pioAction = pio.a;
+          if(pioAction === 'mixed'){
+            const roll = Math.random();
+            const cf = pio.cf || 0, rf = pio.rf || 0;
+            if(roll < cf) pioAction = 'call';
+            else if(roll < cf + rf) pioAction = 'raise';
+            else pioAction = 'fold';
           }
-        } else if(potOdds<0.18 && draw && (draw.flush||draw.oesd)){
-          rec='跟注听牌 Call (Draw Odds)'; verdict='warn';
-          why=`强听牌(Strong Draw)——${draw.flush?'同花听牌(Flush Draw)':'两头顺听牌(OESD)'}，共 <b>${draw.outs}</b> 张补牌(Outs)。底池赔率(Pot Odds)便宜(${poP}%)，即使当前胜率不足，隐含赔率(Implied Odds)使跟注有利。`;
-        } else {
-          rec='弃牌 Fold'; verdict='bad';
-          why=`精准胜率(Precise Equity) <b>${eqP}%</b> < 所需底池赔率(Pot Odds) <b>${poP}%</b>。跟注(Call)长期亏损(-EV)，弃牌(Fold)止损是数学上的正确决策。`;
+          if(pioAction === 'raise' && pio.f && Math.random() > pio.f) pioAction = 'call';
+
+          if(pioAction === 'raise'){
+            const rs = pio.rs || 2.8;
+            const raiseAmt = Math.min(G.currentBet + Math.max(G.minRaise||BB_AMT, Math.round(pot*(rs>3?0.72:rs)/5)*5), p.bet+p.stack);
+            if(_isTwoPairOnPairedBoard){
+              rec='跟注 Call (配对面两对)'; verdict='warn';
+              why=`⚠️ PioSOLVER: 配桌面两对(Two Pair on Paired Board)，加注只会被更好的牌跟注。GTO建议跟注抓诈唬。手牌分类 <b>${handCat}</b>，${tex.note}。${_pairedBoardWarn}`;
+            } else {
+              recAmt=raiseAmt; rec=`加注 Raise 到 ${raiseAmt}`; verdict='ok';
+              why=`📊 PioSOLVER: ${tex.note}，手牌分类 <b>${handCat}</b> → 加注 ${rs}x (${(pio.f*100)|0}%频率)。${handCat==='nuts'?'坚果加注获取最大价值(Max Value)。':'价值加注(Value Raise)，建立大底池。'}`;
+            }
+          } else if(pioAction === 'call'){
+            rec='跟注 Call'; verdict = (eq*eqCoeff>=potOdds)?'ok':'warn';
+            why=`📊 PioSOLVER: ${tex.note}，手牌分类 <b>${handCat}</b> → 跟注(${(pio.f*100)|0}%频率)。精准胜率 ${eqP}%，底池赔率 ${poP}%。${eq*eqCoeff>=potOdds?'跟注长期盈利(+EV).':'Pio防守范围(Defending Range)内，考虑隐含赔率(Implied Odds).'}${_isTwoPairOnPairedBoard?' '+_pairedBoardWarn:''}${rioInfo.warn?' ⚠️ '+rioInfo.note:''}`;
+          } else {
+            rec='弃牌 Fold'; verdict='bad';
+            why=`📊 PioSOLVER: ${tex.note}，手牌分类 <b>${handCat}</b> → 弃牌(${(pio.f*100)|0}%频率)。精准胜率 ${eqP}% < 底池赔率 ${poP}%，不在Pio防守范围内。跟注长期亏损(-EV)。`;
+          }
+          if(freqMode && pio.a === 'mixed'){
+            const cfP = Math.round((pio.cf||0)*100), rfP = Math.round((pio.rf||0)*100);
+            mixFreq = {fold:100-cfP-rfP, call:cfP, raise:rfP};
+          }
+        } else if(!_isDonkSpot) {
+          // Fallback: Monte Carlo heuristics for facing bet
+          const valueRaise = (_isTwoPairOnPairedBoard ? false : _crCat >= 2) || eq >= 0.72;
+          if(valueRaise && evRaise!=null && evRaise>evCall){
+            recAmt=RStd; rec=`价值加注 Value Raise 到 ${RStd}`; verdict='ok';
+            why=`胜率 ${eqP}% 明显领先，加注(Raise)获取最大价值。加注EV > 跟注EV。`;
+          } else if(draw && (draw.flush||draw.oesd) && evRaise!=null && evRaise>(evCall||0)+3 && opp===1 && p.stack>toCall*3 && actionLine !== 'vs_reraise'){
+            recAmt=RStd; rec=`半诈唬加注 Semi-Bluff Raise 到 ${RStd}`; verdict='ok';
+            why=`强听牌(Strong Draw) + 加注EV显著高于跟注。半诈唬加注增加弃牌率，保留隐含赔率。`;
+          } else if(eq * eqCoeff >= potOdds){
+            if(freqMode && Math.abs(eq*eqCoeff-potOdds)<=0.04){
+              const callPct = Math.round(Math.max(30,Math.min(85, (eq*eqCoeff-potOdds+0.04)/0.08*70+15)));
+              mixFreq = {fold:100-callPct, call:callPct, raise:0};
+              rec = `混合策略 Mixed: ${callPct}%跟注Call / ${100-callPct}%弃牌Fold`; verdict = 'warn';
+              why = `精准胜率 ${eqP}% ≈ 底池赔率 ${poP}%，处于GTO无差异区间。均衡策略要求按频率混合。`;
+            } else {
+              rec='跟注 Call'; verdict='ok';
+              why=`精准胜率 ${eqP}% ≥ 底池赔率 ${poP}%。跟注长期盈利(+EV)。${_pairedBoardWarn}${rioInfo.warn?'⚠️ '+rioInfo.note:''}`;
+            }
+          } else if(potOdds<0.18 && draw && (draw.flush||draw.oesd)){
+            rec='跟注听牌 Call (Draw Odds)'; verdict='warn';
+            why=`强听牌——${draw.flush?'同花听牌':'两头顺听牌'}，<b>${draw.outs}</b> 张补牌。底池赔率便宜(${poP}%)，隐含赔率使跟注有利。`;
+          } else {
+            rec='弃牌 Fold'; verdict='bad';
+            why=`精准胜率 ${eqP}% < 底池赔率 ${poP}%。跟注长期亏损(-EV)，弃牌止损。`;
+          }
         }
       }
     }
 
     // === PioSOLVER Distilled Enhancements ===
     let pioExtra = '';
+    // 0. Pio decision badge (when Pio tables were primary source)
+    if(G.street!=='preflop'){
+      const _hc = classifyHand(p.hole, G.board);
+      const _pCtx = toCall > 0 ? 'vsBet' : 'first';
+      const _pio = pioLookup(G.street, tex.type, _hc, _pCtx);
+      if(_pio){
+        const catLabels = {nuts:'坚果(Nuts)',topPair:'顶对+(Top Pair+)',midPair:'中对(Mid Pair)',weakPair:'弱对(Weak Pair)',strongDraw:'强听牌(Strong Draw)',weakDraw:'弱听牌(Weak Draw)',air:'空气(Air)'};
+        const catLabel = catLabels[_hc] || _hc;
+        pioExtra += '<div style="margin-top:5px;padding:4px 8px;background:rgba(76,175,80,.10);border-left:3px solid #4caf50;border-radius:4px;font-size:10px;color:#81c784"><b>📊 PioSOLVER决策:</b> '+catLabel+' @ '+tex.note+' → Pio推荐: <b>'+_pio.a+'</b>'+(_pio.s?' '+(_pio.s*100|0)+'%pot':'')+(_pio.rs?' '+_pio.rs+'x':'')+' ('+((_pio.f*100)|0)+'%频率)</div>';
+      }
+    }
     // 1. Exploit adjustment based on villain style
     const villain = players.filter(x=>!x.human&&!x.folded&&x.inHand);
     const villainStyle = villain.length===1 && villain[0].arch ? Object.keys(STYLES).find(k=>STYLES[k]===villain[0].arch) : null;

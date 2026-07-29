@@ -997,7 +997,7 @@ const BB_DEFEND_EXTRA={UTG:new Set('K9s Q9s J9s T8s 98s 87s 76s 65s 54s'.split('
 let lastCoachRec='';
 let botStats=[...Array(N)].map(()=>({bets:0,calls:0,folds:0,raises:0}));
 function noteBotAct(i,kind){if(i===HUMAN) return;const s=botStats[i];if(kind==='bet'||kind==='raise') s.raises++;else if(kind==='call') s.calls++;else if(kind==='fold') s.folds++;}
-function boardTexture(board){if(board.length===0) return {is:null,wetness:null,type:'preflop',highCards:[],pair:false,flushDraw:false,straightDraw:false,twoTone:false,note:''};const ranks=board.map(c=>c.rank), suits=board.map(c=>c.suit);const rc=new Array(15).fill(0); ranks.forEach(r=>{rc[r]++;if(r===14)rc[1]++;});const sc=[0,0,0,0]; suits.forEach(s=>sc[s]++);const maxR=Math.max(...ranks), minR=Math.min(...ranks);const is={Ahigh:rc[14]>0,Khigh:maxR>=13,low:maxR<=8,medium:!rc[14]&&maxR<=12&&maxR>=9};let maxConsecutive=0, cur=0;const rset=new Set(ranks);for(let i=2;i<=14;i++){ if(rset.has(i)){cur++;maxConsecutive=Math.max(maxConsecutive,cur);}else{cur=0;} }if(rset.has(14)&&rset.has(2)){ let wheelCur=1; for(let i=2;i<=5;i++){ if(rset.has(i)) wheelCur++; else break; } maxConsecutive=Math.max(maxConsecutive,wheelCur); }const flushDraw=sc.some(s=>s>=2&&s<5);const twoTone=sc.filter(s=>s>=2).length>=2;const pair=rc.some(c=>c>=2);const connected=maxConsecutive>=3;let straightDraw=connected;if(!straightDraw){if(rset.has(14)){const hiSpan=maxR-Math.min(...ranks.filter(r=>r!==14));const loSpan=Math.max(...ranks.map(r=>r===14?1:r))-Math.min(...ranks.map(r=>r===14?1:r));straightDraw=(hiSpan<=4)||(loSpan<=4);} else { straightDraw=(maxR-minR<=4); }}let wetness,type;if(pair) wetness='配对面';else if(flushDraw&&straightDraw) wetness='双湿润';else if(flushDraw) wetness='同花听牌面';else if(straightDraw) wetness='顺子听牌面';else wetness='干燥面';if(flushDraw||straightDraw||pair) type='wet';else if(is.Ahigh||is.Khigh) type='dry_high';else type='dry_low';const note=`${type==='wet'?'⚠️ 湿润面(Wet Board)'+(pair?'-配对面(Paired)':flushDraw?'-同花+顺子危险(Flush+Straight Draw)':'')+'':type==='dry_high'?'干燥高牌面(Dry High Board)-范围优势方(Range Advantage)有利':'干燥低牌面(Dry Low Board)-双方范围都不太中牌'}`;return {is,wetness,type,highCards:[...(new Set(board.filter(c=>c.rank>=10).map(c=>c.rank)))],pair,flushDraw:flushDraw&&!sc.some(s=>s>=5),straightDraw,connected,twoTone,note};}
+function boardTexture(board){if(board.length===0) return {is:null,wetness:null,type:'preflop',highCards:[],pair:false,flushDraw:false,straightDraw:false,twoTone:false,note:''};const ranks=board.map(c=>c.rank), suits=board.map(c=>c.suit);const rc=new Array(15).fill(0); ranks.forEach(r=>{rc[r]++;if(r===14)rc[1]++;});const sc=[0,0,0,0]; suits.forEach(s=>sc[s]++);const maxR=Math.max(...ranks), minR=Math.min(...ranks);const is={Ahigh:rc[14]>0,Khigh:maxR>=13,low:maxR<=8,medium:!rc[14]&&maxR<=12&&maxR>=9};let maxConsecutive=0, cur=0;const rset=new Set(ranks);for(let i=2;i<=14;i++){ if(rset.has(i)){cur++;maxConsecutive=Math.max(maxConsecutive,cur);}else{cur=0;} }if(rset.has(14)&&rset.has(2)){ let wheelCur=1; for(let i=2;i<=5;i++){ if(rset.has(i)) wheelCur++; else break; } maxConsecutive=Math.max(maxConsecutive,wheelCur); }const flushDraw=sc.some(s=>s>=2&&s<5);const twoTone=sc.filter(s=>s>=2).length>=2;const pair=rc.some(c=>c>=2);const connected=maxConsecutive>=3;let straightDraw=connected;if(!straightDraw){if(rset.has(14)){const hiSpan=maxR-Math.min(...ranks.filter(r=>r!==14));const loSpan=Math.max(...ranks.map(r=>r===14?1:r))-Math.min(...ranks.map(r=>r===14?1:r));straightDraw=(hiSpan<=4)||(loSpan<=4);} else { straightDraw=(maxR-minR<=4); }}let wetness,type;if(pair) wetness='配对面';else if(flushDraw&&straightDraw) wetness='双湿润';else if(flushDraw) wetness='同花听牌面';else if(straightDraw) wetness='顺子听牌面';else wetness='干燥面';const mono=sc.some(s=>s>=3);if(mono) type='mono';else if(pair&&(flushDraw||straightDraw)) type='paired_wet';else if(pair) type='paired_dry';else if(connected&&maxR>=12) type='high_connected';else if((is.Ahigh||is.Khigh)&&!connected) type='dry_high';else if(flushDraw||straightDraw) type='wet';else if(is.low&&!connected) type='brick';else type='dry_low';const noteMap={'mono':'⚠️ 同花面(Monotone) — 极谨慎，小注低频','paired_wet':'配对面+听牌(Paired Wet) — 中等频率','paired_dry':'干燥配对面(Paired Dry) — 高频小注c-bet','high_connected':'高牌连接面(High Connected) — 范围交叉多','dry_high':'干燥高牌面(Dry High) — 范围优势，高频小注','wet':'⚠️ 湿润面(Wet) — 低频大注保护','brick':'砖头面(Brick) — 中等频率小注','dry_low':'干燥低牌面(Dry Low) — 双方都不太中'};const note=noteMap[type]||noteMap['dry_low'];return {is,wetness,type,highCards:[...(new Set(board.filter(c=>c.rank>=10).map(c=>c.rank)))],pair,flushDraw:flushDraw&&!sc.some(s=>s>=5),straightDraw,connected,twoTone,note};}
 function sprInfo(potVal,stackVal){const spr=potVal>0?stackVal/potVal:999;let cat='deep', sizeRec='小注(⅓-½池) Small Bet', risk='';if(spr<=2) {cat='ultra_low';sizeRec='全下/大注 All-in/Large Bet';risk='顶对无条件打光(Stack-off with Top Pair)';}else if(spr<=4) {cat='low';sizeRec='⅔池(可计划打光) ⅔ Pot';risk='顶对可三街打光(3-Street Value)';}else if(spr<=7) {cat='medium';sizeRec='混合(½-¾池) Mixed';risk='中等牌需控池(Pot Control)';}else {cat='deep';sizeRec='小注(⅓-½池)控池 Small Bet';risk='顶对也不宜全下(No Stack-off)';}return {spr:Math.round(spr*10)/10, cat, sizeRec, risk};}
 function reverseImpliedOddsCheck(heroHole, board, eq, facingTier){if(board.length<3 || !facingTier) return {warn:false,note:'',adjEq:eq};const tex=boardTexture(board);const myRank=evaluate7(heroHole.concat(board));const cat=myRank[0];let warn=false, adjEq=eq, note='';if(cat===2){const myHi=myRank[1];if(myHi<Math.max(...board.map(c=>c.rank))){warn=true;adjEq=eq*0.85;note='你的两对(Two Pair)不含牌面最高牌点——反向隐含赔率(Reverse Implied Odds)大。对手如果继续，很可能持有更好的两对或暗套(Set)。';}}if(cat===1 && tex.type==='wet' && myRank[1]<Math.max(...board.map(c=>c.rank))){warn=true;adjEq=eq*0.88;note='中对(Middle Pair)在湿润面(Wet Board)——反向隐含赔率(Reverse Implied Odds)。你的牌可能被更好的对子主导(Dominated)，且在听牌多的牌面权益实现率低。';}if(cat===5){const myHiFlush=heroHole.map(c=>c.rank).filter(r=>r>=8).sort((a,b)=>b-a);if(myHiFlush.length===0||myHiFlush[0]<=10){warn=true;adjEq=eq*0.80;note='小同花(Low Flush)！被cooler(被更大同花击败)风险高。对手如果有同花听牌(Flush Draw)，很可能持有更高的同花牌。';}}return {warn,note,adjEq};}
 function blockerSummary(hole,board){const info=[];if(board.some(c=>c.suit===hole[0].suit&&hole[0].suit===hole[1].suit)){const boardNut=board.filter(c=>c.suit===hole[0].suit);if(boardNut.length>=3) info.push(`持有同花(Flush)，阻断(Block)更多同花组合(Combos)`);else if(boardNut.length===2){const hiHole=Math.max(hole[0].rank,hole[1].rank);if(hiHole>=13) info.push(`持有${hiHole===14?'A高同花阻断(A-high Flush Blocker)':'K高同花阻断(K-high Flush Blocker)'}——降低对手持有坚果同花(Nut Flush)的概率`);}}const maxB=Math.max(...board.map(c=>c.rank));if(hole.some(c=>c.rank===maxB)&&board.length>=3) info.push(`持有顶对牌点(Top Pair Rank) ${maxB===14?'A':maxB}，阻断对手顶对(Top Pair)组合`);return info;}
@@ -1007,7 +1007,93 @@ function isCbetSpot(){if(!G) return false;return G.street==='flop' && G.currentB
 function heroDraw(hole,board){if(board.length===0||board.length>=5) return null;const cards=hole.concat(board);const res={flush:false,oesd:false,gutshot:false,outs:0};const sc=[0,0,0,0]; cards.forEach(c=>sc[c.suit]++);for(let s=0;s<4;s++){if(sc[s]===4 && hole.some(c=>c.suit===s)){ res.flush=true; res.outs+=9; break; }}const pres=new Array(16).fill(false);cards.forEach(c=>{pres[c.rank]=true; if(c.rank===14)pres[1]=true;});let bestNeed=9;for(let lo=1;lo<=10;lo++){ let cnt=0; for(let k=0;k<5;k++) if(pres[lo+k]) cnt++; if(cnt===4) bestNeed=Math.min(bestNeed,1); }if(bestNeed===1){let fillers=0;for(let r=2;r<=14;r++){if(pres[r]) continue;const tmp=pres.slice(); tmp[r]=true; if(r===14)tmp[1]=true;for(let lo=1;lo<=10;lo++){ let c=0; for(let k=0;k<5;k++) if(tmp[lo+k])c++; if(c>=5){fillers++;break;} }}if(fillers>=2){ res.oesd=true; res.outs+=8; }else if(fillers===1){ res.gutshot=true; res.outs+=4; }}return (res.flush||res.oesd||res.gutshot)? res : null;}
 const GTO_RFI = {UTG:0.16,UTG1:0.18,MP:0.20,MP1:0.22,HJ:0.22,CO:0.30,BTN:0.44,SB:0.36,BB:0};
 function effectiveRFI(pos){if(N===2&&pos==='BTN')return 131/169;if(N===3&&pos==='BTN')return 120/169;if(N<=5&&pos==='BTN')return 99/169;return GTO_RFI[pos]||0;}
-const GTO_CBET = {dry_high:0.72, dry_low:0.48, wet:0.56, paired:0.62};
+const GTO_CBET = {dry_high:0.72, dry_low:0.48, wet:0.56, paired:0.62, paired_dry:0.68, paired_wet:0.50, mono:0.35, high_connected:0.55, brick:0.55};
+// === PioSOLVER Distilled Strategy Tables ===
+const PIO_STRATEGY = {
+  cbet: {
+    dry_high:{ip:{freq:.72,size:.33,note:'高频小注，范围优势'},oop:{freq:.55,size:.50}},
+    dry_low:{ip:{freq:.42,size:.33},oop:{freq:.35,size:.50}},
+    wet:{ip:{freq:.48,size:.66,note:'低频大注保护'},oop:{freq:.38,size:.66}},
+    mono:{ip:{freq:.35,size:.25,note:'极谨慎'},oop:{freq:.28,size:.33}},
+    paired_dry:{ip:{freq:.68,size:.33},oop:{freq:.52,size:.33}},
+    paired_wet:{ip:{freq:.50,size:.50},oop:{freq:.40,size:.50}},
+    high_connected:{ip:{freq:.55,size:.50,note:'范围交叉多'},oop:{freq:.42,size:.50}},
+    brick:{ip:{freq:.55,size:.33},oop:{freq:.45,size:.33}}
+  },
+  vsBet: {
+    flop:{dry_high:{call:52,raise:12,fold:36,rSz:3.0},wet:{call:45,raise:18,fold:37,rSz:2.8},mono:{call:40,raise:8,fold:52,rSz:2.5},paired_dry:{call:55,raise:10,fold:35,rSz:3.0},paired_wet:{call:48,raise:14,fold:38,rSz:2.8},high_connected:{call:50,raise:15,fold:35,rSz:2.8},brick:{call:50,raise:10,fold:40,rSz:3.0},dry_low:{call:48,raise:10,fold:42,rSz:3.0}},
+    turn:{dry_high:{call:48,raise:10,fold:42,rSz:2.8},wet:{call:42,raise:15,fold:43,rSz:2.5},mono:{call:38,raise:6,fold:56,rSz:2.5},paired_dry:{call:50,raise:8,fold:42,rSz:2.8},paired_wet:{call:44,raise:12,fold:44,rSz:2.5},high_connected:{call:46,raise:12,fold:42,rSz:2.5},brick:{call:46,raise:8,fold:46,rSz:2.8},dry_low:{call:44,raise:8,fold:48,rSz:2.8}},
+    river:{dry_high:{call:45,raise:8,fold:47,rSz:2.5},wet:{call:40,raise:10,fold:50,rSz:2.5},mono:{call:35,raise:5,fold:60,rSz:2.5},paired_dry:{call:48,raise:6,fold:46,rSz:2.5},paired_wet:{call:42,raise:8,fold:50,rSz:2.5},high_connected:{call:44,raise:8,fold:48,rSz:2.5},brick:{call:44,raise:6,fold:50,rSz:2.5},dry_low:{call:42,raise:6,fold:52,rSz:2.5}}
+  },
+  barrel: {
+    overpair:{freq:.75,size:.66,note:'持续价值下注'},
+    topPair:{freq:.55,size:.55,note:'中等频率barrel'},
+    middlePair:{freq:.30,size:.50,note:'偶尔保护性下注'},
+    strongDraw:{freq:.60,size:.66,note:'强听牌继续'},
+    missedDraw:{freq:.35,size:.75,note:'选择性bluff'},
+    air:{freq:.15,size:.66,note:'仅好blocker时'}
+  },
+  river: {
+    size_third:{value:75,bluff:25,mdf:.75},
+    size_half:{value:67,bluff:33,mdf:.67},
+    size_pot:{value:50,bluff:50,mdf:.50},
+    size_over:{value:40,bluff:60,mdf:.38}
+  }
+};
+function pioSizing(street,texture,handCat,spr){
+  if(spr<=2) return {pct:1.0,label:'全下 All-in (SPR≤2)'};
+  if(spr<=4 && handCat>=2) return {pct:.75,label:'¾池 (低SPR强牌)'};
+  const sz = PIO_STRATEGY.cbet[texture];
+  if(!sz) return {pct:.50,label:'½池 (默认)'};
+  const ip = sz.ip||{size:.50};
+  const base = ip.size;
+  if(street==='river' && handCat>=3) return {pct:Math.min(1.0,base+0.25),label:'河牌强牌加大'};
+  if(street==='turn' && handCat>=2) return {pct:Math.min(.75,base+0.15),label:'转牌价值加大'};
+  return {pct:base,label:Math.round(base*100)+'% pot (Pio标准)'};
+}
+function exploitAdjustment(heroHole, board, villainStyle, street, eq, potOdds){
+  if(!villainStyle || villainStyle==='REG' || villainStyle==='BAL') return {adj:'',note:''};
+  const s = STYLES[villainStyle]||{};
+  let adj='', note='';
+  if(villainStyle==='FISH'){
+    if(eq>=0.45) {adj='拓宽价值';note='对手是鱼(Fish)：用更宽的价值范围下注，中对+可价值下注。跟注门槛降低5%。';}
+    else {adj='减少诈唬';note='对手是鱼(Fish)：减少bluff，他们不爱弃牌(Station)。'}
+  } else if(villainStyle==='NIT'){
+    adj='增加诈唬';note='对手是紧手(Nit)：增加bluff频率，他们弃牌率极高。价值范围可缩窄（他们只跟好牌）。';
+  } else if(villainStyle==='LAG'||villainStyle==='MANIAC'){
+    if(eq>=0.50) {adj='陷阱+宽跟';note='对手是松凶(LAG/Maniac)：用强牌设陷阱(Trap/Slow-play)，跟注范围拓宽。他们air比例高，加注弃牌率低。';}
+    else {adj='弃牌更紧';note='对手松凶但你有弱牌：弃牌更紧，等好牌再反击。'}
+  } else if(villainStyle==='TAG'){
+    adj='标准GTO';note='对手是常规(TAG)：标准GTO策略适用，无需特别调整。';
+  }
+  return {adj,note};
+}
+function multiStreetPlan(hole, board, street, eq, spr){
+  if(street==='preflop') return '';
+  const tex = boardTexture(board);
+  const score = evaluate7(hole.concat(board));
+  const cat = score[0];
+  let plan = '';
+  if(street==='flop'){
+    if(cat>=3) plan=`📋 暗三条+：计划三街价值(3-Street Value)，翻牌⅓→转牌⅔→河牌全下`;
+    else if(cat===2) plan=`📋 两对+：SPR=${spr.spr}，${spr.cat==='low'?'可计划打光(Stack-off)':'翻牌下注→转牌评估'}`;
+    else if(cat===1 && eq>=0.60) plan=`📋 强顶对：翻牌下注⅓-½池，转牌出高牌继续barrel`;
+    else if(cat===1) plan=`📋 中对/弱顶对：考虑过牌控池(Pot Control)，转牌再评估`;
+    else if(eq>=0.35 && (tex.type==='dry_high'||tex.type==='paired_dry')) plan=`📋 空气牌+范围优势面：翻牌c-bet，若被跟转牌放弃或找二次bluff`;
+    else plan=`📋 弱牌：过牌，寻找改善或bluff机会`;
+  } else if(street==='turn'){
+    if(cat>=3) plan=`📋 暗三条+：转牌⅔池，河牌全下或超池`;
+    else if(cat===2) plan=`📋 两对：转牌价值下注，河牌评估是否够打第三条街`;
+    else if(cat===1 && eq>=0.55) plan=`📋 顶对：转牌⅔池价值，河牌看牌面决定`;
+    else plan=`📋 中等/弱牌：转牌控池，河牌摊牌或bluff`;
+  } else if(street==='river'){
+    if(cat>=3) plan=`📋 坚果级：河牌大注/全下获取最大价值`;
+    else if(cat>=2) plan=`📋 两对+：河牌价值下注½-¾池`;
+    else if(cat===1) plan=`📋 一对：河牌过牌摊牌或薄价值(Thin Value)`;
+    else plan=`📋 空气：评估bluff——有blocker且对手范围弱时可bluff`;
+  }
+  return plan;
+}
 function posLabel(id){const off=(id-button+N)%N;return POS_LABELS[N][off];}
 function evBars(items){const max=Math.max(...items.map(i=>Math.abs(i.val)),1);return '<div class="evrows">'+items.map(i=>{const w=Math.max(2,Math.round(Math.abs(i.val)/max*100));const pos=i.val>=0;return `<div class="evrow${i.rec?' rec':''}"><span class="evlab">${i.rec?'★ ':''}${i.label}</span><span class="evbar"><i style="width:${w}%;background:${i.val===0?'#4a5560':pos?'var(--good)':'var(--bad)'}"></i></span><span class="evval">${pos&&i.val!==0?'+':''}${Math.round(i.val)}</span></div>`;}).join('')+'</div>';}
 
@@ -1320,15 +1406,17 @@ function showCoach(){
         } else if(draw && (draw.flush||draw.oesd) && evBet>(evCall||0)+2 && opp<=1){
           recAmt=bStd; rec=`半诈唬下注 Semi-Bluff ${bStd}`; verdict='ok';
           why=`强听牌(Strong Draw)——${draw.flush?'同花听牌(Flush Draw, 9张补牌/Outs)':'两头顺听牌(OESD, 8张补牌/Outs)'}，弃牌率(Fold Equity) ${(fe*100|0)}%。下注可立即赢池(Win Pot Now)或中牌赢大底池，双向正期望(+EV)。`;
-        } else if(cbetSpot && tex.type==='dry_high' && eq>=0.30){
-          const cbetFreq = GTO_CBET.dry_high;
+        } else if(cbetSpot && tex.type!=='preflop' && GTO_CBET[tex.type]>=0.50 && eq>=0.30){
+          const cbetFreq = GTO_CBET[tex.type]||0.50;
+          const cbetSize = tex.type==='mono'?0.25:tex.type==='wet'||tex.type==='high_connected'?0.66:tex.type==='paired_wet'?0.50:0.33;
           if(mixRoll('flop', cbetFreq)){
-            recAmt=Math.min(Math.max(BB_AMT,Math.round(pot*0.33/5)*5),p.stack);
-            rec=`持续下注 Cbet ${recAmt} (⅓ Pot)`; verdict='ok';
-            why=`翻前加注者(PFR)在干燥高牌面(Dry High Board)，GTO以 <b>${(cbetFreq*100|0)}%</b> 频率持续下注(Continuation Bet)。范围优势(Range Advantage)在你这边，小注高频下注迫使对手弃牌(Fold Equity)。本手下注。`;
+            const sizeLabel = cbetSize<=0.33?'⅓ Pot':cbetSize<=0.50?'½ Pot':'⅔ Pot';
+            recAmt=Math.min(Math.max(BB_AMT,Math.round(pot*cbetSize/5)*5),p.stack);
+            rec=`持续下注 Cbet ${recAmt} (${sizeLabel})`; verdict='ok';
+            why=`翻前加注者(PFR)在${tex.note}，PioSOLVER以 <b>${(cbetFreq*100|0)}%</b> 频率持续下注@${(cbetSize*100)|0}%pot。本手下注。`;
           } else {
             rec='过牌 Check (混合过牌 Mixed Check)'; verdict='ok';
-            why=`翻前加注者(PFR)在干燥高牌面，GTO约 <b>${((1-cbetFreq)*100|0)}%</b> 频率过牌保持范围平衡(Range Balance)。混合策略(Mixed Strategy)让对手无法剥削你。本手过牌。`;
+            why=`翻前加注者(PFR)在此牌面，PioSOLVER约 <b>${((1-cbetFreq)*100|0)}%</b> 频率过牌保持范围平衡(Range Balance)。本手过牌。`;
           }
         } else if(eq >= fairShare+0.10){
           if(G.street==='river'){
@@ -1389,6 +1477,32 @@ function showCoach(){
       }
     }
 
+    // === PioSOLVER Distilled Enhancements ===
+    let pioExtra = '';
+    // 1. Exploit adjustment based on villain style
+    const villain = players.filter(x=>!x.human&&!x.folded&&x.inHand);
+    const villainStyle = villain.length===1 && villain[0].arch ? Object.keys(STYLES).find(k=>STYLES[k]===villain[0].arch) : null;
+    const exploitInfo = exploitAdjustment(p.hole, G.board, villainStyle, G.street, eq, potOdds);
+    if(exploitInfo.adj && exploitInfo.adj!=='标准GTO'){
+      pioExtra += `<div style="margin-top:5px;padding:4px 8px;background:rgba(232,185,74,.08);border-left:3px solid var(--gold);border-radius:4px;font-size:10px;color:var(--gold)"><b>⚡ 利用性 Exploit vs ${villainStyle}:</b> ${exploitInfo.adj} — ${exploitInfo.note}</div>`;
+    }
+    // 2. Multi-street plan
+    if(G.street!=='preflop' && G.street!=='showdown'){
+      const plan = multiStreetPlan(p.hole, G.board, G.street, eq, spr);
+      if(plan) pioExtra += `<div style="margin-top:4px;font-size:10px;color:var(--text2)">${plan}</div>`;
+    }
+    // 3. PioSOLVER reference sizing
+    if(G.street!=='preflop' && tex.type!=='preflop'){
+      const score7 = evaluate7(p.hole.concat(G.board));
+      const pioSz = pioSizing(G.street, tex.type, score7[0], spr.spr);
+      pioExtra += `<div style="margin-top:3px;font-size:9px;color:var(--text3)">📊 Pio参考尺度: ${pioSz.label}</div>`;
+    }
+    // 4. Vs-bet reference frequencies
+    if(toCall>0 && G.street!=='preflop' && PIO_STRATEGY.vsBet[G.street] && PIO_STRATEGY.vsBet[G.street][tex.type]){
+      const vsb = PIO_STRATEGY.vsBet[G.street][tex.type];
+      pioExtra += `<div style="margin-top:3px;font-size:9px;color:var(--text3)">📊 Pio面对下注参考: ${vsb.call}%跟注 / ${vsb.raise}%加注 / ${vsb.fold}%弃牌 (加注${vsb.rSz}x)</div>`;
+    }
+
     co.classList.add('show');
     const eqLine = (toCall>0&&eqRange!=null)
       ? `<span style="color:var(--text2)">精准胜率(Precise Equity) <b>vs ${actionLine}</b> 范围: <span class="num">${eqP}%</span> · 底池赔率(Pot Odds) <span class="num">${poP}%</span>${G.street==='preflop'&&toCall>0?` · <span style="color:var(--warn)">实现率(EQ Realization) <b>${(eqR*100)|0}%</b></span>`:''}</span>`
@@ -1434,6 +1548,7 @@ function showCoach(){
       </div>
       <div class="coach-brief">${why}</div>
       ${freqHtml}
+      ${pioExtra}
       ${villainRangeHTML}
       <div style="margin-top:6px">${evBars(items)}</div>
       <details class="coach-details">

@@ -1136,6 +1136,70 @@ function boardTexture(board){if(board.length===0) return {is:null,wetness:null,t
 function sprInfo(potVal,stackVal){const spr=potVal>0?stackVal/potVal:999;let cat='deep', sizeRec='小注(⅓-½池) Small Bet', risk='';if(spr<=2) {cat='ultra_low';sizeRec='全下/大注 All-in/Large Bet';risk='顶对无条件打光(Stack-off with Top Pair)';}else if(spr<=4) {cat='low';sizeRec='⅔池(可计划打光) ⅔ Pot';risk='顶对可三街打光(3-Street Value)';}else if(spr<=7) {cat='medium';sizeRec='混合(½-¾池) Mixed';risk='中等牌需控池(Pot Control)';}else {cat='deep';sizeRec='小注(⅓-½池)控池 Small Bet';risk='顶对也不宜全下(No Stack-off)';}return {spr:Math.round(spr*10)/10, cat, sizeRec, risk};}
 function reverseImpliedOddsCheck(heroHole, board, eq, facingTier){if(board.length<3 || !facingTier) return {warn:false,note:'',adjEq:eq};const tex=boardTexture(board);const myRank=evaluate7(heroHole.concat(board));const cat=myRank[0];let warn=false, adjEq=eq, note='';if(cat===2){const myHi=myRank[1];if(tex.pair){const br=board.map(c=>c.rank),pairR=br.find((r,i)=>br.indexOf(r)!==i);if(myHi===pairR||myRank[2]===pairR){warn=true;adjEq=eq*0.78;note='⚠️ 配桌面两对(Two Pair on Paired Board)：你的两对含牌面对子，实际强度≈弱两对。加注只会被三条/葫芦跟注(Only Better Calls)。PioSOLVER建议：跟注抓诈唬(Bluff Catch)，不宜加注。';}}else if(myHi<Math.max(...board.map(c=>c.rank))){warn=true;adjEq=eq*0.85;note='你的两对(Two Pair)不含牌面最高牌点——反向隐含赔率(Reverse Implied Odds)大。对手如果继续，很可能持有更好的两对或暗套(Set)。';}}if(cat===1 && tex.type==='wet' && myRank[1]<Math.max(...board.map(c=>c.rank))){warn=true;adjEq=eq*0.88;note='中对(Middle Pair)在湿润面(Wet Board)——反向隐含赔率(Reverse Implied Odds)。你的牌可能被更好的对子主导(Dominated)，且在听牌多的牌面权益实现率低。';}if(cat===5){const myHiFlush=heroHole.map(c=>c.rank).filter(r=>r>=8).sort((a,b)=>b-a);if(myHiFlush.length===0||myHiFlush[0]<=10){warn=true;adjEq=eq*0.80;note='小同花(Low Flush)！被cooler(被更大同花击败)风险高。对手如果有同花听牌(Flush Draw)，很可能持有更高的同花牌。';}}return {warn,note,adjEq};}
 function blockerSummary(hole,board){const info=[];if(board.some(c=>c.suit===hole[0].suit&&hole[0].suit===hole[1].suit)){const boardNut=board.filter(c=>c.suit===hole[0].suit);if(boardNut.length>=3) info.push(`持有同花(Flush)，阻断(Block)更多同花组合(Combos)`);else if(boardNut.length===2){const hiHole=Math.max(hole[0].rank,hole[1].rank);if(hiHole>=13) info.push(`持有${hiHole===14?'A高同花阻断(A-high Flush Blocker)':'K高同花阻断(K-high Flush Blocker)'}——降低对手持有坚果同花(Nut Flush)的概率`);}}const maxB=Math.max(...board.map(c=>c.rank));if(hole.some(c=>c.rank===maxB)&&board.length>=3) info.push(`持有顶对牌点(Top Pair Rank) ${maxB===14?'A':maxB}，阻断对手顶对(Top Pair)组合`);return info;}
+// Quantitative blocker adjustment for call/fold/bluff frequencies
+// Returns: {bluffAdj: +/-bluff frequency adjustment, callAdj: +/-call frequency, note: string}
+function blockerAdjustment(hole, board, texType){
+  if(board.length < 3) return {bluffAdj:0, callAdj:0, note:''};
+  let bluffAdj = 0, callAdj = 0;
+  const notes = [];
+  const suits = board.map(c=>c.suit);
+  const sc = [0,0,0,0]; suits.forEach(s=>sc[s]++);
+  const holeSuits = hole.map(c=>c.suit);
+  const holeRanks = hole.map(c=>c.rank);
+  const boardRanks = board.map(c=>c.rank);
+  const maxBoardRank = Math.max(...boardRanks);
+
+  // 1. Nut flush draw blocker (A or K of flush suit on 2-tone board)
+  const flushDrawSuit = sc.findIndex(cnt => cnt === 2);
+  if(flushDrawSuit >= 0){
+    const hasNutFlushBlocker = hole.some(c => c.suit === flushDrawSuit && c.rank >= 13);
+    const hasFlushBlocker = hole.some(c => c.suit === flushDrawSuit && c.rank >= 11);
+    if(hasNutFlushBlocker){
+      bluffAdj += 0.12; // A-high blocks nut flush, good bluff candidate
+      notes.push('A阻断坚果同花，适合诈唬');
+    } else if(hasFlushBlocker){
+      bluffAdj += 0.06;
+      notes.push('高牌阻断同花');
+    }
+    // If we HAVE the flush draw, we block opponent's flush draws less
+    if(holeSuits.includes(flushDrawSuit)){
+      callAdj += 0.05; // Our draw blocks their draws, slightly more callable
+    }
+  }
+
+  // 2. Top pair blocker (having the top board rank in hole)
+  if(holeRanks.includes(maxBoardRank) && board.length >= 3){
+    // We block top pair combos → opponent has top pair less often
+    bluffAdj += 0.05;
+    callAdj -= 0.03; // Opponent less likely to have top pair, so their bets are more polarized
+    notes.push('阻断顶对');
+  }
+
+  // 3. Straight blockers on connected boards
+  if(texType === 'high_connected' || texType === 'wet'){
+    const hasStraightBlocker = holeRanks.some(r => boardRanks.some(br => Math.abs(r - br) <= 2));
+    if(hasStraightBlocker && holeRanks.some(r => r >= 10)){
+      bluffAdj += 0.04;
+      notes.push('阻断顺子');
+    }
+  }
+
+  // 4. Monotone board: having the flush suit is a big blocker
+  if(texType === 'mono'){
+    const monoSuit = sc.findIndex(cnt => cnt >= 3);
+    if(monoSuit >= 0 && holeSuits.includes(monoSuit)){
+      if(holeRanks.some(r => r >= 13)){
+        bluffAdj += 0.15; callAdj += 0.08;
+        notes.push('阻断坚果同花面');
+      } else {
+        bluffAdj += 0.08;
+        notes.push('阻断同花面');
+      }
+    }
+  }
+
+  return {bluffAdj, callAdj, note: notes.join('，')};
+}
 function streetFE(street, heroIsPFR, opp){if(street==='preflop') return {base:0.35,name:'翻前'};if(street==='flop'){const b=heroIsPFR?0.38:0.28;return {base:Math.max(0.10,b-opp*0.10),name:'Flop'};}if(street==='turn'){const b=heroIsPFR?0.28:0.22;return {base:Math.max(0.08,b-opp*0.08),name:'Turn'};}const b=heroIsPFR?0.20:0.18;return {base:Math.max(0.05,b-opp*0.05),name:'River'};}
 function heroIsPFR(){if(!G||G.street==='preflop') return null;if(G.pfAggressor!=null) return G.pfAggressor===HUMAN;return players[HUMAN].invested > BB_AMT*1.5;}
 function isCbetSpot(){if(!G) return false;return G.street==='flop' && G.currentBet<=0 && heroIsPFR();}
@@ -1175,16 +1239,34 @@ const PIO_STRATEGY = {
     size_over:{value:40,bluff:60,mdf:.38}
   }
 };
+// Geometric bet sizing: plan bets to reach all-in by river with optimal sizing
+function geometricSize(pot, stack, streetsRemaining){
+  if(streetsRemaining <= 0 || pot <= 0) return pot;
+  const spr = stack / pot;
+  // Each bet = pot * r where r^n = spr (geometric progression to all-in)
+  const r = Math.pow(spr, 1/streetsRemaining);
+  const betSize = pot * (r - 1);
+  return Math.max(pot * 0.25, Math.min(stack, betSize));
+}
 function pioSizing(street,texture,handCat,spr){
-  if(spr<=2) return {pct:1.0,label:'全下 All-in (SPR≤2)'};
-  if(spr<=4 && handCat>=2) return {pct:.75,label:'¾池 (低SPR强牌)'};
+  if(spr<=2) return {pct:1.0,label:'全下 (SPR≤2)'};
+  // Geometric sizing for value hands planning multiple streets
+  const streetsLeft = street==='flop' ? 3 : street==='turn' ? 2 : 1;
+  const geoBet = geometricSize(1, spr, streetsLeft); // as % of pot
+  const geoPct = Math.round(geoBet * 100) / 100;
+  if(spr<=4 && handCat>=2){
+    // Low SPR strong hand: geometric sizing to get all-in
+    return {pct:Math.min(1.0, geoPct), label:`几何尺度 ${Math.round(geoPct*100)}% (${streetsLeft}街打光)`};
+  }
   const sz = PIO_STRATEGY.cbet[texture];
   if(!sz) return {pct:.50,label:'½池 (默认)'};
   const ip = sz.ip||{size:.50};
-  const base = ip.size;
-  if(street==='river' && handCat>=3) return {pct:Math.min(1.0,base+0.25),label:'河牌强牌加大'};
-  if(street==='turn' && handCat>=2) return {pct:Math.min(.75,base+0.15),label:'转牌价值加大'};
-  return {pct:base,label:Math.round(base*100)+'% pot (Pio标准)'};
+  let base = ip.size;
+  // Use geometric sizing as upper bound for value hands
+  if(handCat>=2 && geoPct > base) base = Math.min(geoPct, 1.0);
+  if(street==='river' && handCat>=3) return {pct:Math.min(1.5,base+0.25),label:`河牌强牌 ${(Math.min(1.5,base+0.25)*100)|0}%`};
+  if(street==='turn' && handCat>=2) return {pct:Math.min(1.0,base+0.15),label:`转牌价值 ${(Math.min(1.0,base+0.15)*100)|0}%`};
+  return {pct:base,label:`${Math.round(base*100)}%池`};
 }
 function exploitAdjustment(heroHole, board, villainStyle, street, eq, potOdds){
   if(!villainStyle || villainStyle==='REG' || villainStyle==='BAL') return {adj:'',note:''};
@@ -1229,6 +1311,90 @@ function multiStreetPlan(hole, board, street, eq, spr){
   }
   return plan;
 }
+// === Range Advantage Calculator ===
+// Determines if hero's overall range is stronger/weaker than villain's on current board
+// Returns: {adv: 0-1 (0.5=balanced, >0.5=hero advantage, <0.5=villain advantage),
+//           heroEq: average equity of hero range, label: human-readable description}
+function rangeAdvantage(heroHole, board, actionLine){
+  if(board.length < 3) return {adv: 0.5, heroEq: 0.5, label: '翻前'};
+  // Build hero's range based on preflop actions
+  const heroIsPFR_local = heroIsPFR();
+  const heroPos = posLabel(players[HUMAN].id);
+  // Hero range: what they could have gotten here with
+  let heroRangeStr;
+  if(heroIsPFR_local){
+    // PFR range: standard opening range for position
+    if(['UTG','UTG1'].includes(heroPos)) heroRangeStr = '77+ ATs+ AJo+ KTs+ KQo QTs+ JTs';
+    else if(['MP','MP1'].includes(heroPos)) heroRangeStr = '55+ A9s+ ATo+ KTs+ KJo+ QTs+ JTs T9s 98s';
+    else if(heroPos==='HJ') heroRangeStr = '44+ A8s+ A9o+ KTs+ KJo+ QTs+ JTs T9s 98s 87s';
+    else if(heroPos==='CO') heroRangeStr = '33+ A5s+ A8o+ K9s+ KTo+ Q9s+ JTo+ T9s 98s 87s 76s 65s';
+    else if(heroPos==='BTN') heroRangeStr = '22+ A2s+ A5o+ K8s+ K9o+ Q9s+ J9s+ T8s+ 97s+ 87s 76s 65s 54s';
+    else if(heroPos==='SB') heroRangeStr = '33+ A7s+ A9o+ KTs+ KJo+ QTs+ JTs T9s';
+    else heroRangeStr = '22+ A2s+ A8o+ K9s+ KTo+ Q9s+ J9s+ T9s 98s 87s 76s 65s'; // BB defend
+  } else {
+    // Caller/defender range: wider, more speculative
+    if(heroPos==='BB') heroRangeStr = '22+ A2s+ A5o+ K8s+ K9o+ Q8s+ J8s+ T8s+ 97s+ 87s 76s 65s 54s';
+    else heroRangeStr = '44+ A8s+ A9o+ KTs+ KJo+ QTs+ JTs T9s 98s 87s 76s 65s';
+  }
+  // Expand hero range to combos
+  const heroRangeSet = expandRange(heroRangeStr);
+  const dead = new Set([...heroHole, ...board].map(keyOf));
+  const pool = freshDeck().filter(c => !dead.has(keyOf(c)));
+  const heroCombos = [];
+  for(let i=0; i<pool.length; i++) for(let j=i+1; j<pool.length; j++){
+    const combo = [pool[i], pool[j]];
+    if(heroRangeSet.has(handNotation(combo))) heroCombos.push(combo);
+  }
+  if(heroCombos.length < 4) return {adv: 0.5, heroEq: 0.5, label: '范围太小'};
+  // Build villain range
+  const villActionLine = actionLine === 'vs_bet' ? 'vs_bet' : actionLine === 'vs_check' ? 'vs_check' : 'vs_bet';
+  const villainCombos = buildVillainRange(heroHole, board, villActionLine);
+  if(villainCombos.length < 4) return {adv: 0.5, heroEq: 0.5, label: '对手范围不明'};
+  // Sample: hero range vs villain range on current board
+  const SAMPLE_HERO = Math.min(25, heroCombos.length);
+  const SAMPLE_VILL = Math.min(25, villainCombos.length);
+  const ITERS = 200;
+  let totalEq = 0, valid = 0;
+  for(let it=0; it<ITERS; it++){
+    const hi = Math.floor(Math.random() * heroCombos.length);
+    const vi = Math.floor(Math.random() * villainCombos.length);
+    const hCombo = heroCombos[hi];
+    const vCombo = villainCombos[vi];
+    // Skip dead cards
+    const hKeys = new Set(hCombo.map(keyOf));
+    if(vCombo.some(c => hKeys.has(keyOf(c)))) continue;
+    // Evaluate on current board (no more cards to deal if river)
+    if(board.length === 5){
+      const c = cmp(evaluate7(hCombo.concat(board)), evaluate7(vCombo.concat(board)));
+      const eq = c > 0 ? 1 : c === 0 ? 0.5 : 0;
+      totalEq += eq; valid++;
+    } else {
+      // Sample random runouts
+      const allDead = new Set([...hCombo, ...vCombo, ...board].map(keyOf));
+      const remaining = pool.filter(c => !allDead.has(keyOf(c)));
+      const need = 5 - board.length;
+      if(remaining.length < need) continue;
+      // Shuffle and take `need` cards
+      for(let i=0; i<need; i++){
+        const j = i + Math.floor(Math.random() * (remaining.length - i));
+        [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+      }
+      const fullBoard = board.concat(remaining.slice(0, need));
+      const c = cmp(evaluate7(hCombo.concat(fullBoard)), evaluate7(vCombo.concat(fullBoard)));
+      const eq = c > 0 ? 1 : c === 0 ? 0.5 : 0;
+      totalEq += eq; valid++;
+    }
+  }
+  if(valid < 10) return {adv: 0.5, heroEq: 0.5, label: '采样不足'};
+  const heroEq = totalEq / valid;
+  const adv = heroEq; // 0.5 = balanced, >0.5 = hero advantage
+  let label = '范围平衡';
+  if(adv >= 0.58) label = '范围优势明显';
+  else if(adv >= 0.53) label = '轻微范围优势';
+  else if(adv <= 0.42) label = '范围劣势明显';
+  else if(adv <= 0.47) label = '轻微范围劣势';
+  return {adv, heroEq, label};
+}
 // === Hand Category Classification for Pio Lookup ===
 function classifyHand(hole, board){
   if(board.length<3) return 'preflop';
@@ -1236,41 +1402,157 @@ function classifyHand(hole, board){
   const cat = score[0]; // 0=highcard,1=pair,2=twopair,3=trips,4=straight,5=flush,6=fullhouse,7=quads,8=straightflush
   const ranks = board.map(c=>c.rank);
   const maxR = Math.max(...ranks);
+  const secondR = [...new Set(ranks)].sort((a,b)=>b-a)[1]||0;
   const holeRanks = hole.map(c=>c.rank);
   const topKicker = Math.max(...holeRanks);
+  const minHole = Math.min(...holeRanks);
+  const suited = hole[0].suit === hole[1].suit;
+
   // Draws (only on flop/turn)
   const suits = board.map(c=>c.suit);
   const sc = [0,0,0,0]; suits.forEach(s=>sc[s]++);
   const holeSuits = hole.map(c=>c.suit);
-  const flushDraw = sc.some((cnt,i)=>cnt===2&&holeSuits.includes(i)&&sc[i]+holeSuits.filter(s=>s===i).length>=4);
-  // Straight draw check
-  const allR = [...new Set([...ranks,...holeRanks])];
+  const hasNutFlushDraw = sc.some((cnt,i)=>cnt===2 && holeSuits.includes(i) && (hole.some(c=>c.suit===i && c.rank>=13) || hole.some(c=>c.suit===i && c.rank>=12)));
+  const hasFlushDraw = sc.some((cnt,i)=>cnt===2 && holeSuits.includes(i) && sc[i]+holeSuits.filter(s=>s===i).length>=4);
+  const hasBackdoorFlush = board.length===3 && sc.some((cnt,i)=>cnt===2 && holeSuits.includes(i));
+
+  // Straight draw check - use ALL cards (hole + board)
   const hasOESD = (function(){
     if(board.length>=5) return false;
-    const rset = new Set(ranks);
-    let maxC=0,c=0;
-    for(let i=2;i<=14;i++){if(rset.has(i)){c++;maxC=Math.max(maxC,c);}else c=0;}
-    return maxC>=3 && holeRanks.some(r=>{const ns=new Set([...ranks,r]);if(r===14)ns.add(1);let mc2=0,c2=0;for(let i=2;i<=14;i++){if(ns.has(i)){c2++;mc2=Math.max(mc2,c2);}else c2=0;}return mc2>=5;});
+    const ns = new Set([...ranks, ...holeRanks]);
+    if(holeRanks.includes(14)) ns.add(1);
+    // Check all windows of 5 consecutive ranks
+    for(let start=2; start<=10; start++){
+      let count=0, missing=[];
+      for(let i=start; i<start+5; i++){
+        if(ns.has(i)) count++;
+        else missing.push(i);
+      }
+      // OESD: 4 out of 5, and the missing card is at either end
+      if(count===4 && missing.length===1){
+        const m = missing[0];
+        if(m===start || m===start+4) return true; // open-ended
+      }
+    }
+    return false;
   })();
-  // Classification
-  if(cat>=4) return 'nuts'; // straight+
-  if(cat===3) return board.length>=4 && ranks.some(r=>r===score[1])?'nuts':'topPair'; // trips: nut if board pairs the trips rank
+  const hasGutshot = (function(){
+    if(board.length>=5) return false;
+    // Include BOTH hole cards + board ranks
+    const ns = new Set([...ranks, ...holeRanks]);
+    if(holeRanks.includes(14)) ns.add(1); // ace low
+    for(let start=2; start<=10; start++){
+      let count=0, missing=[];
+      for(let i=start; i<start+5; i++){
+        if(ns.has(i)) count++;
+        else missing.push(i);
+      }
+      if(count===4 && missing.length===1) return true; // need exactly 1 card
+    }
+    return false;
+  })();
+
+  // Combo draw: flush draw + straight draw or pair + draw
+  const isComboDraw = (hasFlushDraw && hasOESD) || (hasFlushDraw && hasGutshot) || (cat===1 && hasFlushDraw);
+
+  // Paired board check
+  const boardPair = ranks.length !== new Set(ranks).size;
+
+  // === Made hands ===
+  if(cat>=6) return 'nutMade'; // fullhouse+
+  if(cat===5) return 'nutMade'; // flush
+  if(cat===4) return 'nutMade'; // straight
+  if(cat===3) return 'set'; // trips
   if(cat===2){
-    if(board.some(r=>r===score[1])&&board.filter(c=>c===score[1]).length>=2) return 'midPair'; // two pair using board pair
-    return 'topPair';
+    if(boardPair) return 'topPair'; // two pair on paired board = essentially top pair
+    // Check if both hole cards are in the two pair
+    const myPairs = [score[1], score[2]];
+    const holeInBoard = holeRanks.filter(r=>myPairs.includes(r)).length;
+    if(holeInBoard===2) return 'topTwoPair';
+    return 'topPair'; // second pair + board pair
   }
   if(cat===1){
-    if(score[1]===maxR && topKicker>=maxR) return 'topPair';
-    if(score[1]===maxR) return 'topPair';
-    if(score[1]>=maxR-1 && maxR<=12) return 'midPair';
-    if(score[1]>=9) return 'midPair';
-    return 'weakPair';
+    const pairRank = score[1];
+    // Overpair: pocket pair higher than all board cards
+    if(holeRanks[0]===holeRanks[1] && pairRank > maxR) return 'overpair';
+    // Underpair: pocket pair lower than all board cards
+    if(holeRanks[0]===holeRanks[1] && pairRank < Math.min(...ranks)) return 'underpair';
+    // Pocket pair between board cards
+    if(holeRanks[0]===holeRanks[1]) return 'weakPair';
+    // Kicker = the hole card that's NOT the pair
+    const kicker = holeRanks.find(r => r !== pairRank) || Math.min(...holeRanks);
+    // Top pair
+    if(pairRank === maxR){
+      if(kicker >= 13) return 'topPairTopKicker';
+      if(kicker >= 11) return 'topPair';
+      return 'topPair';
+    }
+    // Second pair
+    if(pairRank === secondR || (pairRank >= maxR-1 && maxR <= 12)) return 'secondPair';
+    // Third pair / weak pair
+    if(pairRank >= 9) return 'weakPair';
+    return 'thirdPair';
   }
-  if(flushDraw || hasOESD) return 'strongDraw';
-  if(cat===0 && topKicker>=13 && board.length<5) return 'weakDraw'; // overcards
+
+  // === Draws ===
+  if(isComboDraw) return 'comboDraw';
+  if(hasNutFlushDraw) return 'nutFlushDraw';
+  if(hasFlushDraw) return 'flushDraw';
+  if(hasOESD) return 'oesd';
+  if(hasGutshot && board.length<5) return 'gutshot';
+
+  // === No pair, no draw ===
+  if(cat===0){
+    const overs = holeRanks.filter(r=>r>maxR).length;
+    if(overs===2) return 'overcards';
+    if(overs===1 && topKicker>=13) return 'oneOver';
+    if(hasBackdoorFlush && board.length===3) return 'gutshot'; // backdoor as weak draw
+  }
   return 'air';
 }
-// === PioSOLVER Hand-Category Strategy Tables ===
+// Strength tier: 'strong', 'medium', 'draw', 'weak', 'air'
+function handCatTier(cat){
+  if(['nutMade','set','overpair','topTwoPair','topPairTopKicker'].includes(cat)) return 'strong';
+  if(['topPair','secondPair'].includes(cat)) return 'medium';
+  if(['comboDraw','nutFlushDraw','flushDraw','oesd'].includes(cat)) return 'draw';
+  if(['underpair','thirdPair','weakPair'].includes(cat)) return 'weak';
+  if(['gutshot','overcards','oneOver'].includes(cat)) return 'air';
+  return 'air';
+}
+// Map fine-grained categories to table keys (7 categories in PIO_HAND_STRATEGY)
+function handCatToTableKey(cat, street){
+  const map = {
+    nutMade: 'nuts',
+    set: 'nuts',
+    overpair: street==='flop'?'nuts':'topPair',
+    topTwoPair: 'topPair',
+    topPairTopKicker: 'topPair',
+    topPair: 'topPair',
+    secondPair: 'midPair',
+    underpair: 'weakPair',
+    thirdPair: 'weakPair',
+    weakPair: 'weakPair',
+    comboDraw: 'strongDraw',
+    nutFlushDraw: 'strongDraw',
+    flushDraw: 'strongDraw',
+    oesd: 'strongDraw',
+    gutshot: 'weakDraw',
+    overcards: 'weakDraw',
+    oneOver: 'weakDraw',
+    air: 'air'
+  };
+  return map[cat] || 'air';
+}
+// Human-readable labels for the 18 categories
+const HAND_CAT_LABELS = {
+  nutMade:'超强牌',set:'暗三条',overpair:'超对',topTwoPair:'顶两对',
+  topPairTopKicker:'顶对顶踢脚',topPair:'顶对',secondPair:'第二对',
+  underpair:'低对',thirdPair:'底对',weakPair:'弱对',
+  comboDraw:'组合听牌',nutFlushDraw:'坚果同花听牌',flushDraw:'同花听牌',
+  oesd:'两头顺听牌',gutshot:'卡顺听牌',overcards:'两张高牌',
+  oneOver:'一张高牌',air:'未中牌'
+};
+
 // context: 'first' (first to act), 'vsBet' (facing bet), 'vsRaise' (facing raise)
 // action: 'bet','check','call','fold','raise','mixed'
 const PIO_HAND_STRATEGY = {
@@ -1418,6 +1700,8 @@ function showCoach(){
     const pfr = G.street!=='preflop' ? heroIsPFR() : null;
     const tex = G.street!=='preflop' ? boardTexture(G.board) : boardTexture([]);
     const spr = sprInfo(G.pot, p.stack);
+    const rangeAdv = G.street!=='preflop' ? rangeAdvantage(p.hole, G.board, actionLine) : {adv:0.5, heroEq:0.5, label:'翻前'};
+    const blockerAdj = G.street!=='preflop' ? blockerAdjustment(p.hole, G.board, tex.type) : {bluffAdj:0, callAdj:0, note:''};
     const btInfo = G.street!=='preflop' ? blockerSummary(p.hole, G.board) : [];
     const rioInfo = G.street!=='preflop'&&toCall>0 ? reverseImpliedOddsCheck(p.hole,G.board,eq,actionLine) : {warn:false,note:'',adjEq:eq};
     if(rioInfo.warn) eq = rioInfo.adjEq;
@@ -1653,14 +1937,19 @@ function showCoach(){
       // === Post-flop: PioSOLVER-first decision tree ===
       const handCat = classifyHand(p.hole, G.board);
       const pioCtx = toCall > 0 ? 'vsBet' : 'first';
-      const pio = pioLookup(G.street, tex.type, handCat, pioCtx);
+      const pioTableKey = handCatToTableKey(handCat, G.street);
+      const pio = pioLookup(G.street, tex.type, pioTableKey, pioCtx);
       let pioUsed = false;
       if(toCall<=0){
         // First to act — Pio lookup primary
         if(pio){
           pioUsed = true;
-          const shouldBet = pio.a === 'bet' ? (Math.random() < pio.f) : pio.a === 'check' ? (pio.bf && Math.random() < pio.bf) : false;
-          if(shouldBet && (G.street==='turn'||G.street==='river') && handCat==='nuts' && opp<=2 && p.stack>pot*1.5){
+          // Modulate bet frequency based on range advantage + blockers
+          const rangeMod = rangeAdv.adv >= 0.55 ? 1.25 : rangeAdv.adv <= 0.45 ? 0.75 : 1.0;
+          const blockerBluffMod = pio.a === 'check' && pio.bf ? (1 + blockerAdj.bluffAdj * 3) : 1.0;
+          const adjFreq = pio.a === 'bet' ? Math.min(1, pio.f * rangeMod) : pio.bf ? Math.min(1, pio.bf * rangeMod * blockerBluffMod) : 0;
+          const shouldBet = pio.a === 'bet' ? (Math.random() < adjFreq) : pio.a === 'check' ? (pio.bf && Math.random() < adjFreq) : false;
+          if(shouldBet && (G.street==='turn'||G.street==='river') && handCatTier(handCat)==='strong' && opp<=2 && p.stack>pot*1.5){
             const overbetAmt = Math.min(p.stack, Math.round(pot*1.5/5)*5);
             recAmt=overbetAmt; rec=`超池下注 ${overbetAmt}`; verdict='ok';
             why=`<b>你有绝对优势！</b>牌力极强，下大注获取最大价值。胜率 ${eqP}%，对手几乎不可能比你强。`;
@@ -1669,12 +1958,14 @@ function showCoach(){
             const pioAmt = Math.min(Math.max(BB_AMT, Math.round(pot*pioSize/5)*5), p.stack);
             const szLbl = pioSize<=0.25?'¼ Pot':pioSize<=0.33?'⅓ Pot':pioSize<=0.50?'½ Pot':pioSize<=0.66?'⅔ Pot':pioSize<=0.75?'¾ Pot':'Pot';
             recAmt=pioAmt; rec=`下注 ${pioAmt}`; verdict='ok';
-            why=`${tex.note}。你的牌属于<b>${handCat==='nuts'||handCat==='topPair'?'强牌范围，下注拿价值':handCat==='strongDraw'?'听牌，下注半诈唬':'可下注的范围'}</b>。建议下注${(pioSize*100)|0}%底池，GTO在${(pio.f*100)|0}%的类似情况下这样打。`;
+            const tier = handCatTier(handCat);
+            why=`${tex.note}。你的牌(${HAND_CAT_LABELS[handCat]||handCat})属于<b>${tier==='strong'?'强牌范围，下注拿价值':tier==='draw'?'听牌，下注半诈唬':'可下注的范围'}</b>。建议下注${(pioSize*100)|0}%底池，GTO在${(pio.f*100)|0}%的类似情况下这样打。`;
           } else {
-            rec='过牌'; verdict=handCat==='nuts'||handCat==='topPair'?'ok':'warn';
+            rec='过牌'; verdict=handCatTier(handCat)==='strong'?'ok':'warn';
             const checkFreq = pio.a==='bet' ? ((1-pio.f)*100)|0 : pio.a==='check' ? (pio.bf ? ((1-pio.bf)*100)|0 : 100) : 100;
-            why=`${tex.note}。你的牌属于<b>${handCat==='nuts'||handCat==='topPair'?'强牌范围':handCat==='midPair'?'中等牌力':handCat==='weakPair'?'弱对子':'较弱范围'}</b>，GTO建议过牌（约${checkFreq}%的情况）。${pio.a==='check'&&pio.bf?'有时会混合下注作为诈唬。':'控制底池大小，保留摊牌价值。'}`;
-            if(handCat==='nuts'||handCat==='topPair') why += ' 强牌过牌是策略性的，让对手在后续街犯错。';
+            const tier = handCatTier(handCat);
+            why=`${tex.note}。你的牌(${HAND_CAT_LABELS[handCat]||handCat})属于<b>${tier==='strong'?'强牌范围':tier==='medium'?'中等牌力':tier==='weak'?'弱对子':'较弱范围'}</b>，GTO建议过牌（约${checkFreq}%的情况）。${pio.a==='check'&&pio.bf?'有时会混合下注作为诈唬。':'控制底池大小，保留摊牌价值。'}`;
+            if(tier==='strong') why += ' 强牌过牌是策略性的，让对手在后续街犯错。';
           }
         } else {
         // Fallback: Monte Carlo heuristics
@@ -1740,7 +2031,9 @@ function showCoach(){
           let pioAction = pio.a;
           if(pioAction === 'mixed'){
             const roll = Math.random();
-            const cf = pio.cf || 0, rf = pio.rf || 0;
+            // Apply blocker adjustment to call frequency
+            const cf = Math.min(1, (pio.cf || 0) + blockerAdj.callAdj);
+            const rf = pio.rf || 0;
             if(roll < cf) pioAction = 'call';
             else if(roll < cf + rf) pioAction = 'raise';
             else pioAction = 'fold';
@@ -1804,11 +2097,11 @@ function showCoach(){
     if(G.street!=='preflop'){
       const _hc = classifyHand(p.hole, G.board);
       const _pCtx = toCall > 0 ? 'vsBet' : 'first';
-      const _pio = pioLookup(G.street, tex.type, _hc, _pCtx);
+      const _pioKey = handCatToTableKey(_hc, G.street);
+      const _pio = pioLookup(G.street, tex.type, _pioKey, _pCtx);
       if(_pio){
-        const catLabels = {nuts:'超强牌',topPair:'顶对/强牌',midPair:'中等对子',weakPair:'弱对子',strongDraw:'强听牌',weakDraw:'弱听牌/高牌',air:'未中牌'};
         const actLabels = {bet:'下注',check:'过牌',call:'跟注',fold:'弃牌',raise:'加注',mixed:'混合'};
-        const catLabel = catLabels[_hc] || _hc;
+        const catLabel = HAND_CAT_LABELS[_hc] || _hc;
         const actLabel = actLabels[_pio.a] || _pio.a;
         let sizeInfo = _pio.s ? ' '+(_pio.s*100|0)+'%底池' : _pio.rs ? ' '+_pio.rs+'倍' : '';
         pioExtra += '<div style="margin-top:5px;padding:4px 8px;background:rgba(76,175,80,.10);border-left:3px solid #4caf50;border-radius:4px;font-size:10px;color:#81c784"><b>📊 GTO参考:</b> 你的'+catLabel+'在这个牌面 → 建议<b>'+actLabel+sizeInfo+'</b>（'+((_pio.f*100)|0)+'%的情况这样打）</div>';
@@ -1820,6 +2113,17 @@ function showCoach(){
     const exploitInfo = exploitAdjustment(p.hole, G.board, villainStyle, G.street, eq, potOdds);
     if(exploitInfo.adj && exploitInfo.adj!=='标准GTO'){
       pioExtra += `<div style="margin-top:5px;padding:4px 8px;background:rgba(232,185,74,.08);border-left:3px solid var(--gold);border-radius:4px;font-size:10px;color:var(--gold)"><b>⚡ 针对${villainStyle}对手:</b> ${exploitInfo.adj} — ${exploitInfo.note}</div>`;
+    }
+    // 1b. Range advantage indicator
+    if(G.street!=='preflop' && rangeAdv.label !== '翻前'){
+      const advColor = rangeAdv.adv >= 0.53 ? '#81c784' : rangeAdv.adv <= 0.47 ? '#ef9a9a' : '#90caf9';
+      const advIcon = rangeAdv.adv >= 0.53 ? '✅' : rangeAdv.adv <= 0.47 ? '⚠️' : '⚖️';
+      const advHint = rangeAdv.adv >= 0.55 ? '可更频繁下注' : rangeAdv.adv <= 0.45 ? '减少下注频率' : '标准策略';
+      pioExtra += `<div style="margin-top:4px;padding:3px 8px;background:rgba(${rangeAdv.adv>=0.53?'76,175,80':rangeAdv.adv<=0.47?'239,83,80':'33,150,243'},.08);border-left:3px solid ${advColor};border-radius:4px;font-size:10px;color:${advColor}">${advIcon} <b>范围:</b> ${rangeAdv.label}（${(rangeAdv.heroEq*100)|0}%权益）→ ${advHint}</div>`;
+    }
+    // 1c. Blocker effects
+    if(G.street!=='preflop' && blockerAdj.note){
+      pioExtra += `<div style="margin-top:3px;font-size:9px;color:#90caf9">🃏 <b>阻断:</b> ${blockerAdj.note}</div>`;
     }
     // 2. Multi-street plan
     if(G.street!=='preflop' && G.street!=='showdown'){
